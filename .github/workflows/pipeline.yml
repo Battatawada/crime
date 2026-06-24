@@ -1,0 +1,148 @@
+name: Dark Narrative Pipeline
+
+on:
+  schedule:
+    - cron: "0 12 * * 1"
+  workflow_dispatch:
+
+env:
+  VPS_URL: ${{ secrets.VPS_WEBHOOK_URL }}
+  VPS_SECRET: ${{ secrets.VPS_WEBHOOK_SECRET }}
+
+jobs:
+  script-and-audio:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    outputs:
+      run_id: ${{ steps.meta.outputs.run_id }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Phase 1 — NotebookLM
+        env:
+          NOTEBOOKLM_AUTH_JSON: ${{ secrets.NOTEBOOKLM_AUTH_JSON }}
+        run: python src/phase1_script.py --output output
+
+      - name: Capture run_id
+        id: meta
+        run: |
+          RUN_ID=$(python -c "import json; print(json.load(open('output/metadata.json'))['run_id'])")
+          echo "run_id=$RUN_ID" >> "$GITHUB_OUTPUT"
+
+      - name: Phase 2 — edge-tts
+        run: python src/phase2_audio.py --input output --output output
+
+      - name: Trigger VPS image generation
+        run: |
+          python src/trigger_vps.py \
+            --scenes output/scenes.json \
+            --entities output/entities.json \
+            --metadata output/metadata.json \
+            --run-id "${{ steps.meta.outputs.run_id }}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mid-pipeline
+          path: |
+            output/script.txt
+            output/scenes.json
+            output/entities.json
+            output/metadata.json
+            output/narration.mp3
+            output/scene_durations.json
+
+  wait-for-images:
+    needs: script-and-audio
+    runs-on: ubuntu-latest
+    timeout-minutes: 130
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: mid-pipeline
+          path: output
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - run: pip install httpx
+
+      - name: Poll VPS until images ready
+        run: python src/poll_vps.py --run-id "${{ needs.script-and-audio.outputs.run_id }}" --timeout 7200
+
+      - name: Download images from VPS
+        run: |
+          python src/download_vps_images.py \
+            --run-id "${{ needs.script-and-audio.outputs.run_id }}" \
+            --output output/images \
+            --durations output/scene_durations.json
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: images
+          path: output/images
+
+  render-and-upload:
+    needs: [script-and-audio, wait-for-images]
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: mid-pipeline
+          path: output
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: images
+          path: output/images
+
+      - name: Phase 4 — ffmpeg render
+        run: bash src/render_video.sh output
+
+      - name: Phase 5 — YouTube upload
+        env:
+          YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
+          YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+          YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+        run: python src/phase5_upload.py --video output/final_video.mp4 --metadata output/metadata.json
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: final-video
+          path: output/final_video.mp4
+
+      - name: Alert on success
+        if: success()
+        env:
+          ALERT_WEBHOOK_URL: ${{ secrets.ALERT_WEBHOOK_URL }}
+        run: bash scripts/alert.sh "Pipeline complete — run ${{ needs.script-and-audio.outputs.run_id }}"
+
+  notify-failure:
+    needs: [script-and-audio, wait-for-images, render-and-upload]
+    if: failure()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Alert on failure
+        env:
+          ALERT_WEBHOOK_URL: ${{ secrets.ALERT_WEBHOOK_URL }}
+        run: bash scripts/alert.sh "Pipeline FAILED — check GitHub Actions logs"

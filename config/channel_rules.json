@@ -1,0 +1,24 @@
+{
+  "shorts": {
+    "max_per_day": 3,
+    "optimal_times": ["07:00", "12:00", "17:00"]
+  },
+  "long_form": {
+    "max_per_day": 1,
+    "optimal_times": ["19:00"]
+  },
+  "scheduling": {
+    "min_gap_hours": 4,
+    "avoid_hours": [0, 1, 2, 3, 4, 5]
+  },
+  "seo": {
+    "niche": "motivation human psychology",
+    "default_tags": ["motivation", "psychology", "mindset", "self improvement"],
+    "title_max_chars": 65,
+    "region": "US"
+  },
+  "upload": {
+    "privacy": "private",
+    "category_id": "22"
+  }
+}

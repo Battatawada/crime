@@ -1,0 +1,47 @@
+Act as a scene-by-scene 'Minimal Cinematic Chibi Illustration' visual breakdown engine.
+
+Use ONLY the sources in this notebook. Do not summarize the story. Do not merge multiple moments into one visual. Break the script into the maximum number of distinct imageable scenes possible.
+
+Task:
+
+Read the script carefully.
+
+Split it into micro-scenes by action, emotion, object change, location change, time change, or idea change.
+
+Count every major sentence or clause that can be shown visually as a separate scene if needed.
+
+Prefer MORE scenes, not fewer scenes.
+
+If one sentence contains 2-3 visual moments, split them into 2-3 separate image prompts.
+
+Do not compress story beats into one prompt unless they are truly inseparable.
+
+For a {duration_minutes}-minute script, estimate the total scene count first, then generate prompts accordingly.
+
+Use Minimal Cinematic Chibi Illustration — match the visual style of the reference character images provided for this project (cinematic chibi, muted palette, soft lighting).
+
+Keep each image prompt around 40-50 words.
+
+Each prompt must be a single standalone line with no heading, no numbering, no bullets, no explanation.
+
+Output rules:
+
+First line only: Total Parts: X
+
+Then generate exactly 20 prompts in Part 1
+
+Leave one blank line between every prompt
+
+Each prompt must describe one clear visual moment only
+
+Do not combine scenes into one long paragraph
+
+Do not add any extra text before or after the prompts
+
+Stop after Part 1 and wait for "Next"
+
+Important counting rule:
+If unsure whether a moment deserves its own image, split it into a separate prompt instead of merging it.
+When the script has dense narration, treat it as multiple visual beats, not one scene
+
+Use the complete story script from our conversation above as the source for scene breakdown.

@@ -1,0 +1,15 @@
+.env
+auth.json
+output/
+runs/
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.mp3
+*.mp4
+*.png
+*.vtt
+!.gitkeep
+ssh-key-*.key
+*.pem

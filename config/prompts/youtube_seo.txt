@@ -1,0 +1,17 @@
+Based on the story script and topic in this notebook, create YouTube SEO metadata optimized for a US audience.
+
+Topic: {topic}
+
+Output ONLY valid JSON (no markdown):
+{
+  "title": "max 65 chars, high CTR, include hook",
+  "description": "2-3 paragraphs with keywords, timestamps placeholder line, CTA",
+  "tags": ["tag1", "tag2", ... max 15 tags, US search intent],
+  "hashtags": ["#tag1", "#tag2", ... max 5]
+}
+
+Rules:
+- Title must sound native US English, not clickbait spam
+- Tags combined must stay under YouTube 500 character limit
+- Include motivation / psychology keywords where natural
+- Description first 150 chars must hook search + browse features

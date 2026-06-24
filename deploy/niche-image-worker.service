@@ -1,0 +1,15 @@
+[Unit]
+Description=Niche sequential image worker (FlowKit bridge)
+After=network.target
+
+[Service]
+Type=simple
+User=niche
+WorkingDirectory=/opt/niche/vps
+EnvironmentFile=/opt/niche/.env
+ExecStart=/opt/niche/.venv/bin/python image_worker.py
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
