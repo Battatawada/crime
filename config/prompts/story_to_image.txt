@@ -1,4 +1,4 @@
-Act as a scene-by-scene 'Minimal Cinematic Chibi Illustration' visual breakdown engine.
+Act as a scene-by-scene 'Minimalist Stick Figure Line Art' visual breakdown engine.
 
 Use ONLY the sources in this notebook. Do not summarize the story. Do not merge multiple moments into one visual. Break the script into the maximum number of distinct imageable scenes possible.
 
@@ -18,7 +18,7 @@ Do not compress story beats into one prompt unless they are truly inseparable.
 
 For a {duration_minutes}-minute script, estimate the total scene count first, then generate prompts accordingly.
 
-Use Minimal Cinematic Chibi Illustration — match the visual style of the reference character images provided for this project (cinematic chibi, muted palette, soft lighting).
+Use Minimalist Stick Figure Line Art — ONE consistent channel character (circular head, dot eyes, thin black line limbs, cream/beige background). Match reference images: same stick-figure mascot in every scene. For diagram/education moments use clean flat infographic style (teal/navy on beige).
 
 Keep each image prompt around 40-50 words.
 

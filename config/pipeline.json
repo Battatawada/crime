@@ -1,7 +1,7 @@
 {
   "duration_minutes": 15,
-  "default_entity_refs": ["character_A"],
-  "image_style": "Minimal Cinematic Chibi Illustration",
+  "default_entity_refs": ["character_A", "character_pose_walk", "character_pose_sleep", "style_infographic"],
+  "image_style": "Minimalist Stick Figure Line Art",
   "prompts_per_part": 20,
   "continue_keyword": "Next",
   "words_per_minute": 140,

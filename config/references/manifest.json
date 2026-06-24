@@ -2,6 +2,21 @@
   "character_A": {
     "file": "character_A.png",
     "type": "character",
-    "description": "Minimal cinematic chibi style — match uploaded screenshot reference (muted palette, soft cinematic lighting)"
+    "description": "Primary channel mascot — minimalist black stick figure, circular head, dot eyes, simple line limbs, cream/beige background, hand-drawn doodle style"
+  },
+  "character_pose_walk": {
+    "file": "character_pose_walk.png",
+    "type": "character",
+    "description": "Same stick figure character walking, smiling, with simple props — same line-art style as character_A"
+  },
+  "character_pose_sleep": {
+    "file": "character_pose_sleep.png",
+    "type": "character",
+    "description": "Same stick figure sleeping in bed — identical head/face style, minimalist line art"
+  },
+  "style_infographic": {
+    "file": "style_infographic.png",
+    "type": "style",
+    "description": "Clean flat infographic style for diagrams — teal/navy palette, simple labels, educational layout on beige background"
   }
 }
