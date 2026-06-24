@@ -23,15 +23,20 @@ apt-get install -y python3 python3-pip python3-venv ffmpeg xvfb curl git ufw
 
 echo "==> Service user"
 if ! id "$NICHE_USER" &>/dev/null; then
-  useradd -r -m -d "$NICHE_ROOT" -s /bin/bash "$NICHE_USER"
+  useradd -r -m -d /var/lib/niche -s /bin/bash "$NICHE_USER"
 fi
 
 echo "==> Clone/update Niche repo"
 mkdir -p "$(dirname "$NICHE_ROOT")"
-if [[ ! -d "$NICHE_ROOT/.git" ]]; then
+if [[ -d "$NICHE_ROOT/.git" ]]; then
+  git -C "$NICHE_ROOT" pull --ff-only
+elif [[ ! -d "$NICHE_ROOT" ]] || [[ -z "$(ls -A "$NICHE_ROOT" 2>/dev/null)" ]]; then
+  rm -rf "$NICHE_ROOT"
   git clone "$NICHE_REPO_URL" "$NICHE_ROOT"
 else
-  git -C "$NICHE_ROOT" pull --ff-only
+  echo "ERROR: $NICHE_ROOT exists but is not a git repo (often niche user home dir)."
+  echo "Fix: sudo rm -rf $NICHE_ROOT && re-run this script"
+  exit 1
 fi
 chown -R "$NICHE_USER:$NICHE_USER" "$NICHE_ROOT"
 
