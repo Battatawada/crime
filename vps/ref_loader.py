@@ -20,7 +20,9 @@ def load_manifest(refs_dir: Path) -> dict[str, dict[str, Any]]:
     return data
 
 
-def upload_references(refs_dir: Path, client: FlowKitClient | None = None) -> dict[str, str]:
+def upload_references(
+    refs_dir: Path, client: FlowKitClient | None = None, project_id: str = ""
+) -> dict[str, str]:
     """Upload cached PNGs; returns entity_id -> media_id for this session."""
     client = client or FlowKitClient()
     manifest = load_manifest(refs_dir)
@@ -33,7 +35,7 @@ def upload_references(refs_dir: Path, client: FlowKitClient | None = None) -> di
         path = refs_dir / filename
         if not path.exists():
             raise FileNotFoundError(f"Reference image not found: {path}")
-        media_ids[entity_id] = client.upload_image(path)
+        media_ids[entity_id] = client.upload_image(path, project_id=project_id)
 
     return media_ids
 

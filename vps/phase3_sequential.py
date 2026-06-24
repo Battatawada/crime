@@ -79,12 +79,16 @@ class SequentialGenerator:
         _start_flowkit_stack()
         try:
             self.client.ensure_ready()
+            state["phase"] = "project"
+            self._save_state(state)
+
+            project_id = self.client.create_project(title=f"Niche {self.run_id}", story="")
+
             state["phase"] = "refs"
             self._save_state(state)
 
-            ref_media = upload_references(refs_dir_from_env(), self.client)
-            project_id = self.client.create_project(title=f"Niche {self.run_id}", story="")
-            video_id = project_id  # FlowKit ties scenes to project/video context
+            ref_media = upload_references(refs_dir_from_env(), self.client, project_id=project_id)
+            video_id = project_id  # FlowKit ties scenes to project context
 
             state["phase"] = "scenes"
             self._save_state(state)
