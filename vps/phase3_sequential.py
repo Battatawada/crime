@@ -23,15 +23,35 @@ def _rewrite_prompt_safe(prompt: str) -> str:
 
 
 def _start_flowkit_stack() -> None:
+    if os.environ.get("FLOWKIT_USE_SYSTEMD", "1") == "1":
+        return
     script = os.environ.get("FLOWKIT_START_SCRIPT")
     if script and Path(script).exists():
         subprocess.run(["bash", script], check=False)
 
 
 def _stop_flowkit_stack() -> None:
+    if os.environ.get("FLOWKIT_USE_SYSTEMD", "1") == "1":
+        return
     script = os.environ.get("FLOWKIT_STOP_SCRIPT")
     if script and Path(script).exists():
         subprocess.run(["bash", script], check=False)
+
+
+def _sanitize_prompt(prompt: str, scene_id: int) -> str:
+    cleaned = " ".join(str(prompt).split()).strip()
+    lower = cleaned.lower()
+    if (
+        len(cleaned.split()) >= 8
+        and not lower.startswith("answer:")
+        and "total parts:" not in lower
+        and not lower.startswith("part ")
+    ):
+        return cleaned
+    return (
+        "Minimalist stick figure line art, consistent circular-head character, "
+        f"cream background, scene {scene_id}, educational psychology mood"
+    )
 
 
 class SequentialGenerator:
@@ -111,7 +131,7 @@ class SequentialGenerator:
 
                 entity_refs = scene.get("entity_refs") or []
                 media_inputs = [ref_media[r] for r in entity_refs if r in ref_media]
-                prompt = scene.get("prompt", "")
+                prompt = _sanitize_prompt(scene.get("prompt", ""), scene_id)
 
                 last_err = ""
                 for attempt in range(1, self.max_retries + 1):

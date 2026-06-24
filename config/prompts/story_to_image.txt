@@ -28,6 +28,8 @@ Output rules:
 
 First line only: Total Parts: X
 
+Do NOT prefix prompts with "Answer:", numbering, bullets, or Part labels.
+
 Then generate exactly 20 prompts in Part 1
 
 Leave one blank line between every prompt

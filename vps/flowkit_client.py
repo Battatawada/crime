@@ -117,6 +117,9 @@ class FlowKitClient:
         orientation: str = "landscape",
     ) -> tuple[str, str]:
         del scene_id, video_id  # direct Flow API uses project + prompt only
+        prompt = " ".join(str(prompt).split()).strip()
+        if not prompt:
+            raise RuntimeError("Refusing to generate image with empty prompt")
         aspect = (
             "IMAGE_ASPECT_RATIO_LANDSCAPE"
             if orientation.lower() in {"landscape", "horizontal"}
@@ -132,7 +135,9 @@ class FlowKitClient:
 
         with httpx.Client(timeout=self.timeout) as client:
             resp = client.post(f"{self.base_url}/api/flow/generate-image", json=body)
-            resp.raise_for_status()
+            if resp.is_error:
+                detail = resp.text[:500]
+                raise RuntimeError(f"FlowKit generate-image failed ({resp.status_code}): {detail}")
             data = resp.json()
 
         image_url, media_id = self._extract_image_url(data)

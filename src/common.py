@@ -160,19 +160,40 @@ def strip_total_parts_header(text: str) -> str:
 
 
 def parse_image_prompt_lines(text: str) -> list[str]:
-    """Parse blank-line-separated chibi image prompts from NotebookLM output."""
+    """Parse blank-line-separated image prompts from NotebookLM output."""
     body = strip_total_parts_header(text)
     blocks = re.split(r"\n\s*\n", body)
     prompts: list[str] = []
     for block in blocks:
         line = " ".join(ln.strip() for ln in block.splitlines() if ln.strip())
-        if not line:
-            continue
-        if re.match(r"^Total Parts:\s*\d+", line, re.IGNORECASE):
-            continue
-        if line.lower().startswith("part "):
-            continue
-        prompts.append(line)
+        if is_valid_image_prompt(line):
+            prompts.append(line)
+    return prompts
+
+
+_METADATA_PROMPT_RE = re.compile(
+    r"^(answer:\s*)?(total parts:\s*\d+|part\s+\d+\s*$|next\s*$)",
+    re.IGNORECASE,
+)
+
+
+def is_valid_image_prompt(line: str, *, min_words: int = 8) -> bool:
+    """Drop NotebookLM headers and other non-prompt lines."""
+    cleaned = line.strip()
+    if not cleaned:
+        return False
+    if _METADATA_PROMPT_RE.match(cleaned):
+        return False
+    if re.match(r"^total parts:\s*\d+", cleaned, re.IGNORECASE):
+        return False
+    if len(cleaned.split()) < min_words:
+        return False
+    return True
+
+
+def cap_scenes(prompts: list[str], max_scenes: int) -> list[str]:
+    if max_scenes > 0 and len(prompts) > max_scenes:
+        return prompts[:max_scenes]
     return prompts
 
 

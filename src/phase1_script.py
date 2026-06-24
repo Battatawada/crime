@@ -21,6 +21,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from common import (
     CONFIG,
     dedupe_prompts,
+    cap_scenes,
     extract_notebook_id,
     extract_source_id,
     fallback_seo,
@@ -195,6 +196,12 @@ def main() -> None:
             prompt_lines = dedupe_prompts(prompt_lines)
             if len(prompt_lines) < before:
                 print(f"  Deduped {before - len(prompt_lines)} repeated prompts", flush=True)
+
+        max_scenes = int(pipeline.get("max_scenes", 60))
+        before_cap = len(prompt_lines)
+        prompt_lines = cap_scenes(prompt_lines, max_scenes)
+        if len(prompt_lines) < before_cap:
+            print(f"  Capped scenes {before_cap} -> {len(prompt_lines)} (max_scenes={max_scenes})", flush=True)
 
         print("[Step 8] YouTube SEO (US)...", flush=True)
         seo_prompt = load_prompt("youtube_seo.txt").replace("{topic}", topic)
