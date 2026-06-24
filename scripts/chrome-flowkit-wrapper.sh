@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
 # Chrome 131 for FlowKit — Oracle VPS / TigerVNC safe launcher.
 CHROME_DIR="/opt/chrome-flowkit"
-
-# VNC usually :1; fall back if not set (e.g. launched from desktop menu).
 export DISPLAY="${DISPLAY:-:1}"
-
+export GNOME_KEYRING_CONTROL=""
+export SSH_AUTH_SOCK=""
 exec "${CHROME_DIR}/chrome" \
   --no-sandbox \
   --disable-setuid-sandbox \
@@ -12,8 +11,8 @@ exec "${CHROME_DIR}/chrome" \
   --disable-gpu \
   --disable-gpu-compositing \
   --use-gl=swiftshader \
-  --disable-software-rasterizer \
   --password-store=basic \
+  --disable-breakpad \
   --no-first-run \
   --no-default-browser-check \
   "$@"
