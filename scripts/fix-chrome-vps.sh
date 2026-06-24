@@ -3,9 +3,10 @@
 set -euo pipefail
 
 CHROME_DIR="/opt/chrome-flowkit"
-CHROME_VERSION="${CHROME_VERSION:-131.0.6778.264}"
+# Chrome for Testing 149 — FlowKit on Oracle VPS / TigerVNC
+CHROME_VERSION="${CHROME_VERSION:-149.0.7827.155}"
 
-echo "==> Remove Google Chrome 149 (system package)"
+echo "==> Remove old Chrome for Testing / system Chrome"
 export DEBIAN_FRONTEND=noninteractive
 if dpkg -l google-chrome-stable 2>/dev/null | grep -q ^ii; then
   apt-get remove -y google-chrome-stable || true

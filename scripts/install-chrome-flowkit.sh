@@ -4,8 +4,8 @@
 set -euo pipefail
 
 CHROME_DIR="/opt/chrome-flowkit"
-# Default: Chrome 131 — FlowKit v1.1.0 tested era; override with CHROME_VERSION=
-CHROME_VERSION="${CHROME_VERSION:-131.0.6778.264}"
+# Default: Chrome 149 for Testing
+CHROME_VERSION="${CHROME_VERSION:-149.0.7827.155}"
 
 mkdir -p "$CHROME_DIR"
 cd /tmp

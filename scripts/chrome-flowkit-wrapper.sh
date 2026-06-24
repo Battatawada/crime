@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Chrome 131 for FlowKit — Oracle VPS / TigerVNC safe launcher.
+# Chrome 149 for FlowKit — Oracle VPS / TigerVNC safe launcher.
 CHROME_DIR="/opt/chrome-flowkit"
 export DISPLAY="${DISPLAY:-:1}"
 export GNOME_KEYRING_CONTROL=""
