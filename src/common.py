@@ -106,6 +106,36 @@ def notebooklm(*args: str, json_out: bool = False) -> str:
     return result.stdout.strip()
 
 
+def notebooklm_json(*args: str) -> dict[str, Any]:
+    """Run notebooklm with --json and parse the response envelope."""
+    data = json.loads(notebooklm(*args, json_out=True))
+    if isinstance(data, dict) and data.get("error"):
+        raise RuntimeError(data.get("message") or str(data))
+    if not isinstance(data, dict):
+        raise RuntimeError(f"Unexpected notebooklm JSON response: {data!r}")
+    return data
+
+
+def extract_notebook_id(payload: dict[str, Any]) -> str:
+    """notebooklm 0.7+ nests create output under ``notebook``."""
+    nb = payload.get("notebook", payload)
+    if isinstance(nb, dict) and nb.get("id"):
+        return str(nb["id"])
+    raise RuntimeError(f"Unexpected notebooklm create response: {payload}")
+
+
+def extract_source_id(payload: dict[str, Any]) -> str:
+    """notebooklm 0.7+ nests source add output under ``source``."""
+    src = payload.get("source", payload)
+    if isinstance(src, dict) and src.get("id"):
+        return str(src["id"])
+    if isinstance(src, dict) and src.get("source_id"):
+        return str(src["source_id"])
+    if payload.get("source_id"):
+        return str(payload["source_id"])
+    raise RuntimeError(f"Unexpected notebooklm source add response: {payload}")
+
+
 def append_github_output(key: str, value: str) -> None:
     out_path = os.environ.get("GITHUB_OUTPUT")
     if out_path:

@@ -22,10 +22,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from common import (
     CONFIG,
     dedupe_prompts,
+    extract_notebook_id,
+    extract_source_id,
     load_json,
     load_prompt,
     new_run_id,
-    notebooklm,
+    notebooklm_json,
     parse_image_prompt_lines,
     parse_seo_json,
     parse_total_parts,
@@ -135,13 +137,13 @@ def main() -> None:
         if not urls or "REPLACE" in str(urls[0]):
             sys.exit("Edit config/seed_urls.json with niche reference YouTube URLs")
 
-        created = json.loads(notebooklm("create", f"{niche.get('name', 'Video')} {run_id}", json_out=True))
-        notebook_id = created["id"]
+        created = notebooklm_json("create", f"{niche.get('name', 'Video')} {run_id}")
+        notebook_id = extract_notebook_id(created)
 
         source_ids: list[str] = []
         for url in urls:
-            added = json.loads(notebooklm("source", "add", url, "--notebook", notebook_id, json_out=True))
-            source_ids.append(added["source_id"])
+            added = notebooklm_json("source", "add", url, "--notebook", notebook_id)
+            source_ids.append(extract_source_id(added))
         wait_sources(notebook_id, source_ids)
 
         print("[Step 1–2] Topics...", flush=True)
