@@ -1,0 +1,20 @@
+[Unit]
+Description=FlowKit Python agent (REST :8100, WebSocket :9222)
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/opt/flowkit
+Environment=API_HOST=127.0.0.1
+Environment=API_PORT=8100
+Environment=WS_HOST=127.0.0.1
+Environment=WS_PORT=9222
+ExecStart=/opt/flowkit/venv/bin/python -m agent.main
+Restart=on-failure
+RestartSec=5
+StandardOutput=append:/var/log/flowkit-agent.log
+StandardError=append:/var/log/flowkit-agent.log
+
+[Install]
+WantedBy=multi-user.target
