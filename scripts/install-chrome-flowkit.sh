@@ -4,8 +4,8 @@
 set -euo pipefail
 
 CHROME_DIR="/opt/chrome-flowkit"
-# Stable channel snapshot ~April 2026 (Chrome 146 — ~2 months before 149)
-CHROME_VERSION="${CHROME_VERSION:-146.0.7653.0}"
+# Default: Chrome 131 — FlowKit v1.1.0 tested era; override with CHROME_VERSION=
+CHROME_VERSION="${CHROME_VERSION:-131.0.6778.264}"
 
 mkdir -p "$CHROME_DIR"
 cd /tmp
