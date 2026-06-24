@@ -53,7 +53,8 @@ chmod +x /usr/local/bin/chrome-flowkit
 cat > /usr/local/bin/start-chrome-flowkit <<'START'
 #!/usr/bin/env bash
 export DISPLAY="${DISPLAY:-:1}"
-PROFILE="${HOME}/.config/chrome-flowkit"
+# Same profile as normal Google Chrome in VNC — keeps your Google / Flow login.
+PROFILE="${HOME}/.config/google-chrome"
 mkdir -p "$PROFILE"
 exec chrome-flowkit --user-data-dir="$PROFILE" "$@"
 START
