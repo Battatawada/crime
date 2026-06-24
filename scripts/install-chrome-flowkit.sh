@@ -20,11 +20,17 @@ mv "$CHROME_DIR/chrome-linux64"/* "$CHROME_DIR/"
 rmdir "$CHROME_DIR/chrome-linux64" 2>/dev/null || true
 chmod +x "$CHROME_DIR/chrome"
 
-cat > /usr/local/bin/chrome-flowkit <<EOF
+cat > /usr/local/bin/chrome-flowkit <<'EOF'
 #!/usr/bin/env bash
-exec ${CHROME_DIR}/chrome "\$@"
+# Oracle/Ubuntu 24 AppArmor blocks Chrome sandbox — safe for isolated VPS + VNC use.
+CHROME_DIR="/opt/chrome-flowkit"
+exec "${CHROME_DIR}/chrome" \
+  --no-sandbox \
+  --disable-setuid-sandbox \
+  --disable-dev-shm-usage \
+  "$@"
 EOF
 chmod +x /usr/local/bin/chrome-flowkit
 
-echo "Installed: chrome-flowkit ($("${CHROME_DIR}/chrome" --version))"
+echo "Installed: chrome-flowkit ($("${CHROME_DIR}/chrome" --version 2>/dev/null || echo ${CHROME_VERSION}))"
 echo "Use in VNC: chrome-flowkit --user-data-dir=\$HOME/.config/chrome-flowkit"
