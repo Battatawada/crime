@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import re
 import sys
+import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -55,21 +56,41 @@ def wait_sources(notebook_id: str, source_ids: list[str], timeout: int = 600) ->
             raise RuntimeError(f"Source {sid} failed: {result.stderr}")
 
 
-def ask(notebook_id: str, prompt: str, *, new: bool = False) -> str:
+def ask(notebook_id: str, prompt: str, *, new: bool = False, retries: int = 4) -> str:
     import subprocess
 
     cmd = ["notebooklm", "ask", prompt, "--notebook", notebook_id]
     if new:
         cmd.extend(["--new", "--yes"])
-    result = subprocess.run(
-        cmd,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-    )
-    if result.returncode != 0:
-        raise RuntimeError(result.stderr or result.stdout or "notebooklm ask failed")
-    return result.stdout.strip()
+    last_err = ""
+    for attempt in range(retries):
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            return result.stdout.strip()
+        last_err = (result.stderr or result.stdout or "notebooklm ask failed").strip()
+        transient = any(
+            s in last_err.lower()
+            for s in (
+                "parseable chunks",
+                "empty response",
+                "streaming chat",
+                "timeout",
+                "temporarily",
+                "rate limit",
+            )
+        )
+        if transient and attempt + 1 < retries:
+            wait = 8 * (attempt + 1)
+            print(f"  notebooklm ask retry {attempt + 2}/{retries} in {wait}s...", flush=True)
+            time.sleep(wait)
+            continue
+        break
+    raise RuntimeError(last_err)
 
 
 _BAD_TOPIC = re.compile(r"continuing conversation|^[a-f0-9]{8,}$", re.IGNORECASE)
@@ -84,15 +105,20 @@ def _first_topic_from_list(topics_raw: str) -> str:
 
 
 def pick_topic(notebook_id: str, topics_raw: str) -> str:
+    """Pick topic in the same NotebookLM chat as topics list (no --new)."""
     prompt = f"{load_prompt('pick_topic.txt')}\n\nTopics:\n{topics_raw}"
-    raw = ask(notebook_id, prompt, new=True)
-    line = raw.strip().splitlines()[0].strip()
-    line = re.sub(r"^\d+[\).\s]+", "", line)
-    line = line.strip('"')
-    if _BAD_TOPIC.search(line) or len(line) < 15:
-        print("  Warning: bad topic pick, using first listed topic", flush=True)
+    try:
+        raw = ask(notebook_id, prompt, new=False)
+        line = raw.strip().splitlines()[0].strip()
+        line = re.sub(r"^\d+[\).\s]+", "", line)
+        line = line.strip('"').strip("'")
+        if _BAD_TOPIC.search(line) or len(line) < 15:
+            print("  Warning: bad topic pick, using first listed topic", flush=True)
+            return _first_topic_from_list(topics_raw)
+        return line
+    except Exception as exc:
+        print(f"  Warning: topic pick failed ({exc}), using first listed topic", flush=True)
         return _first_topic_from_list(topics_raw)
-    return line
 
 
 def collect_multipart_text(
