@@ -31,7 +31,7 @@ jobs:
       - name: Verify NotebookLM auth
         env:
           NOTEBOOKLM_AUTH_JSON: ${{ secrets.NOTEBOOKLM_AUTH_JSON }}
-        run: notebooklm auth check --test
+        run: notebooklm auth check --test --json
 
       - name: Phase 1 — NotebookLM
         env:
