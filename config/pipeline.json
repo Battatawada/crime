@@ -6,5 +6,9 @@
   "continue_keyword": "Next",
   "words_per_minute": 140,
   "dedupe_image_prompts": true,
-  "max_scenes": 60
+  "max_scenes": 60,
+  "tts_voice": "en-US-ChristopherNeural",
+  "tts_rate": "-5%",
+  "max_zoom": 1.06,
+  "caption_max_words": 6
 }

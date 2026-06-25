@@ -20,8 +20,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from common import (
     CONFIG,
-    dedupe_prompts,
     cap_scenes,
+    clean_script_for_tts,
+    dedupe_prompts,
     extract_notebook_id,
     extract_source_id,
     fallback_seo,
@@ -221,7 +222,10 @@ def main() -> None:
                 seo = fallback_seo(topic)
 
     scenes = prompts_to_scenes(prompt_lines, entity_refs)
-    segments = split_script_for_scenes(script, len(scenes))
+    if not args.dry_run:
+        (out / "script_raw.txt").write_text(script, encoding="utf-8")
+    script = clean_script_for_tts(script)
+    segments = [clean_script_for_tts(t) for t in split_script_for_scenes(script, len(scenes))]
 
     (out / "script.txt").write_text(script, encoding="utf-8")
     (out / "topics.txt").write_text(topic, encoding="utf-8")

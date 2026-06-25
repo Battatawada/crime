@@ -38,6 +38,7 @@ def main() -> None:
     parser.add_argument("--video", type=Path, required=True)
     parser.add_argument("--metadata", type=Path, default=Path("output/metadata.json"))
     parser.add_argument("--seo", type=Path, default=Path("output/youtube_seo.json"))
+    parser.add_argument("--captions", type=Path, default=Path("output/captions.srt"))
     args = parser.parse_args()
 
     for key in ("YOUTUBE_CLIENT_ID", "YOUTUBE_CLIENT_SECRET", "YOUTUBE_REFRESH_TOKEN"):
@@ -82,6 +83,29 @@ def main() -> None:
 
     video_id = response["id"]
     print(json.dumps({"video_id": video_id, "url": f"https://youtu.be/{video_id}", "title": title}))
+
+    if args.captions.exists():
+        cap_body = {
+            "snippet": {
+                "videoId": video_id,
+                "language": "en",
+                "name": "English (auto)",
+                "isDraft": False,
+            }
+        }
+        cap_media = MediaFileUpload(
+            str(args.captions), mimetype="application/x-subrip", resumable=True
+        )
+        cap_req = youtube.captions().insert(
+            part="snippet",
+            body=cap_body,
+            media_body=cap_media,
+            sync=True,
+        )
+        cap_resp = cap_req.execute()
+        print(json.dumps({"caption_id": cap_resp.get("id"), "language": "en"}))
+    else:
+        print("No captions.srt — skipped caption upload")
 
 
 if __name__ == "__main__":

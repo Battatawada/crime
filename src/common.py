@@ -42,6 +42,42 @@ def strip_markdown(text: str) -> str:
     return text.strip()
 
 
+def normalize_tts_punctuation(text: str) -> str:
+    """Fix spacing so TTS pauses naturally at punctuation."""
+    text = re.sub(r"\s+([,.!?;:])", r"\1", text)
+    text = re.sub(r"([,.!?;:])(?=[A-Za-z\"'])", r"\1 ", text)
+    text = re.sub(r"\s*,\s*", ", ", text)
+    text = re.sub(r"\s*\.\s*", ". ", text)
+    text = re.sub(r"\s*\?\s*", "? ", text)
+    text = re.sub(r"\s*!\s*", "! ", text)
+    text = re.sub(r"\s+", " ", text)
+    text = re.sub(r"\.\s+\.", ".", text)
+    return text.strip()
+
+
+def clean_script_for_tts(text: str) -> str:
+    """Remove NotebookLM junk and citation markers; keep narration-only text."""
+    text = strip_markdown(text)
+    kept: list[str] = []
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            continue
+        if re.match(r"^answer:\s*$", stripped, re.IGNORECASE):
+            continue
+        if re.match(r"^total\s+(parts|scenes)\s*:\s*\d+", stripped, re.IGNORECASE):
+            continue
+        if re.match(r"^part\s+\d+\s*$", stripped, re.IGNORECASE):
+            continue
+        if re.match(r"^next\s*$", stripped, re.IGNORECASE):
+            continue
+        kept.append(stripped)
+    merged = " ".join(kept)
+    merged = re.sub(r"\[\d+(?:,\s*\d+)*\]", "", merged)
+    merged = re.sub(r"\s+", " ", merged)
+    return normalize_tts_punctuation(merged)
+
+
 def extract_json_blocks(text: str) -> list[Any]:
     """Parse one or more JSON arrays/objects from LLM output."""
     blocks: list[Any] = []
@@ -154,6 +190,10 @@ def parse_total_parts(text: str) -> int:
 
 def strip_total_parts_header(text: str) -> str:
     lines = text.strip().splitlines()
+    if lines and re.match(r"Total Parts:\s*\d+", lines[0], re.IGNORECASE):
+        return "\n".join(lines[1:]).strip()
+    if lines and re.match(r"^Answer:\s*$", lines[0], re.IGNORECASE):
+        lines = lines[1:]
     if lines and re.match(r"Total Parts:\s*\d+", lines[0], re.IGNORECASE):
         return "\n".join(lines[1:]).strip()
     return text.strip()
