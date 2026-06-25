@@ -58,6 +58,18 @@ def normalize_tts_punctuation(text: str) -> str:
 def clean_script_for_tts(text: str) -> str:
     """Remove NotebookLM junk and citation markers; keep narration-only text."""
     text = strip_markdown(text)
+    # Inline metadata (multi-part merges, conversation IDs, etc.)
+    text = re.sub(
+        r"(?i)\b(?:new conversation|continuing conversation|conversation)\s*:\s*"
+        r"[a-f0-9-]{8,}(?:\s*\(\s*turn\s+\d+\s*\))?",
+        "",
+        text,
+    )
+    text = re.sub(r"(?i)\banswer\s*:\s*", "", text)
+    text = re.sub(r"(?i)\btotal\s+(parts|scenes)\s*:\s*\d+", "", text)
+    text = re.sub(r"(?i)\bpart\s+\d+\b", "", text)
+    text = re.sub(r"\b[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}\b", "", text, flags=re.IGNORECASE)
+
     kept: list[str] = []
     for line in text.splitlines():
         stripped = line.strip()
@@ -65,11 +77,19 @@ def clean_script_for_tts(text: str) -> str:
             continue
         if re.match(r"^answer:\s*$", stripped, re.IGNORECASE):
             continue
+        if re.match(r"^answer:\s*total\s+(parts|scenes)\s*:\s*\d+", stripped, re.IGNORECASE):
+            continue
         if re.match(r"^total\s+(parts|scenes)\s*:\s*\d+", stripped, re.IGNORECASE):
             continue
         if re.match(r"^part\s+\d+\s*$", stripped, re.IGNORECASE):
             continue
         if re.match(r"^next\s*$", stripped, re.IGNORECASE):
+            continue
+        if re.match(
+            r"^(?:new conversation|continuing conversation|conversation)\s*:\s*[a-f0-9-]+",
+            stripped,
+            re.IGNORECASE,
+        ):
             continue
         kept.append(stripped)
     merged = " ".join(kept)
@@ -215,6 +235,10 @@ _METADATA_PROMPT_RE = re.compile(
     r"^(answer:\s*)?(total parts:\s*\d+|part\s+\d+\s*$|next\s*$)",
     re.IGNORECASE,
 )
+_CONVERSATION_PROMPT_RE = re.compile(
+    r"^(?:new conversation|continuing conversation|conversation)\s*:\s*[a-f0-9-]+",
+    re.IGNORECASE,
+)
 
 
 def is_valid_image_prompt(line: str, *, min_words: int = 8) -> bool:
@@ -223,6 +247,12 @@ def is_valid_image_prompt(line: str, *, min_words: int = 8) -> bool:
     if not cleaned:
         return False
     if _METADATA_PROMPT_RE.match(cleaned):
+        return False
+    if _CONVERSATION_PROMPT_RE.match(cleaned):
+        return False
+    if re.search(r"(?i)\banswer:\s*total\s+(parts|scenes)\s*:", cleaned):
+        return False
+    if re.search(r"(?i)\b(?:new conversation|conversation)\s*:\s*[a-f0-9-]{8,}", cleaned):
         return False
     if re.match(r"^total parts:\s*\d+", cleaned, re.IGNORECASE):
         return False

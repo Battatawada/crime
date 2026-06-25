@@ -1,81 +1,97 @@
-"""On-screen caption PNGs and SRT generation."""
+"""Karaoke captions (word-synced highlight) and SRT generation."""
 
 from __future__ import annotations
 
 import re
 from pathlib import Path
 
-from PIL import Image, ImageDraw, ImageFont
+# ASS colours are &HBBGGRR
+WHITE = "&HFFFFFF&"
+YELLOW = "&H00D7FF&"
+BLACK = "&H000000&"
 
-from common import clean_script_for_tts
+EMILY = "en-US-EmilyNeural"
+ANDREW = "en-US-AndrewMultilingualNeural"
 
-FONT_CANDIDATES = [
-    "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-    "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
-    "C:/Windows/Fonts/arialbd.ttf",
-]
+ASS_HEADER = """[Script Info]
+ScriptType: v4.00+
+PlayResX: 1920
+PlayResY: 1080
+WrapStyle: 0
 
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Karaoke,Arial Black,52,{white},&H000000FF,{black},&H80000000,1,0,0,0,100,100,0,0,1,4,0,2,80,80,72,1
 
-def _load_font(size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
-    for path in FONT_CANDIDATES:
-        if Path(path).exists():
-            return ImageFont.truetype(path, size)
-    return ImageFont.load_default()
-
-
-def scene_caption_phrase(segment: str, max_words: int = 6) -> tuple[str, int]:
-    """Short uppercase phrase + index of word to highlight in yellow."""
-    clean = clean_script_for_tts(segment)
-    if not clean:
-        return "KEEP GOING", 0
-    sentence = re.split(r"(?<=[.!?])\s+", clean)[0].strip()
-    words = [w for w in re.findall(r"[A-Za-z0-9']+", sentence) if w][:max_words]
-    if not words:
-        words = clean.split()[:max_words]
-    if not words:
-        return "KEEP GOING", 0
-    phrase = " ".join(words).upper()
-    highlight = max(range(len(words)), key=lambda i: len(words[i]))
-    return phrase, highlight
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+"""
 
 
-def render_caption_png(
-    phrase: str,
-    highlight_idx: int,
-    dest: Path,
-    *,
-    width: int = 1920,
-    height: int = 140,
-    font_size: int = 52,
-) -> Path:
-    """White bold text, black outline, one yellow word — bottom overlay strip."""
-    words = phrase.split()
-    if not words:
-        words = ["..."]
-        highlight_idx = 0
-    highlight_idx = max(0, min(highlight_idx, len(words) - 1))
+def ass_time(seconds: float) -> str:
+    cs = max(0, int(round(seconds * 100)))
+    h, rem = divmod(cs, 360_000)
+    m, rem = divmod(rem, 6_000)
+    s, cs_rem = divmod(rem, 100)
+    return f"{h}:{m:02d}:{s:02d}.{cs_rem:02d}"
 
-    font = _load_font(font_size)
-    img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
-    draw = ImageDraw.Draw(img)
 
-    stroke = 4
-    spacing = 14
-    sizes = [draw.textbbox((0, 0), w, font=font) for w in words]
-    total_w = sum(s[2] - s[0] for s in sizes) + spacing * (len(words) - 1)
-    x = (width - total_w) // 2
-    y = (height - (sizes[0][3] - sizes[0][1])) // 2
+def _display_word(raw: str) -> str:
+    return re.sub(r"[^\w']+", "", raw).upper()
 
-    for i, word in enumerate(words):
-        fill = (255, 220, 0, 255) if i == highlight_idx else (255, 255, 255, 255)
-        for ox, oy in [(-stroke, 0), (stroke, 0), (0, -stroke), (0, stroke),
-                       (-stroke, -stroke), (stroke, stroke), (-stroke, stroke), (stroke, -stroke)]:
-            draw.text((x + ox, y + oy), word, font=font, fill=(0, 0, 0, 255))
-        draw.text((x, y), word, font=font, fill=fill)
-        x += sizes[i][2] - sizes[i][0] + spacing
+
+def build_highlight_line(words: list[dict], active_idx: int) -> str:
+    parts: list[str] = []
+    for j, w in enumerate(words):
+        token = _display_word(w.get("text", ""))
+        if not token:
+            continue
+        if j == active_idx:
+            parts.append(f"{{\\1c{YELLOW}\\b1}}{token}{{\\1c{WHITE}\\b1}}")
+        else:
+            parts.append(token)
+    return " ".join(parts) if parts else "..."
+
+
+def estimate_word_timings(text: str, duration: float) -> list[dict]:
+    """Fallback when edge-tts returns no WordBoundary events."""
+    tokens = re.findall(r"\S+", text.strip())
+    if not tokens or duration <= 0:
+        return []
+    weights = [max(1, len(re.sub(r"[^\w']", "", t))) for t in tokens]
+    total = sum(weights)
+    t = 0.0
+    out: list[dict] = []
+    for token, weight in zip(tokens, weights):
+        span = duration * (weight / total)
+        out.append({"text": token, "start": round(t, 4), "end": round(t + span, 4)})
+        t += span
+    return out
+
+
+def write_scene_karaoke_ass(words: list[dict], dest: Path, *, duration: float) -> Path | None:
+    """ASS with one event per word — active word yellow, rest white, black outline."""
+    cleaned = [w for w in words if _display_word(w.get("text", ""))]
+    if not cleaned:
+        return None
+
+    header = ASS_HEADER.format(white=WHITE, black=BLACK)
+    lines = [header.rstrip()]
+
+    for i, w in enumerate(cleaned):
+        start = float(w["start"])
+        if i + 1 < len(cleaned):
+            end = float(cleaned[i + 1]["start"])
+        else:
+            end = max(float(w.get("end", start + 0.2)), start + 0.05)
+        end = min(end, duration)
+        if end <= start:
+            end = start + 0.05
+        text = build_highlight_line(cleaned, i)
+        lines.append(f"Dialogue: 0,{ass_time(start)},{ass_time(end)},Karaoke,,0,0,0,,{text}")
 
     dest.parent.mkdir(parents=True, exist_ok=True)
-    img.save(dest)
+    dest.write_text("\n".join(lines) + "\n", encoding="utf-8-sig")
     return dest
 
 
@@ -118,3 +134,20 @@ def merge_srt_blocks(blocks: list[str], offsets: list[float]) -> str:
             out.append(f"{idx}\n{format_srt_time(start)} --> {format_srt_time(end)}\n{text}\n")
             idx += 1
     return "\n".join(out).strip() + "\n"
+
+
+def pick_narrator_voice(scene_index: int, voices: list[str], segment_text: str) -> str:
+    """
+    Emily leads (~75%); Andrew on every 4th scene (0-based: scenes 3, 7, 11…).
+    Scene 0 always Emily when she is configured as primary.
+    """
+    emily = EMILY
+    andrew = ANDREW
+    for v in voices:
+        if "Emily" in v:
+            emily = v
+        if "Andrew" in v:
+            andrew = v
+    if scene_index % 4 == 3:
+        return andrew
+    return emily

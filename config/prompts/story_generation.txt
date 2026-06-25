@@ -47,6 +47,7 @@ Do not mention topic separately outside narrative
 First line: Total Parts: X
 Then only story text (clean, continuous)
 
-Never output "Answer:", "Total Scenes", citation markers like [1], or any metadata inside the story.
+Never output "Answer:", "Total Scenes", citation markers like [1], conversation IDs, or any metadata inside the story.
+Never write "New conversation:", "Conversation:", UUIDs, or "(turn N)" anywhere in the script.
 Use proper punctuation (. , ? !) so text-to-speech sounds natural.
 Now begin.

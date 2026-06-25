@@ -2,8 +2,8 @@
 """
 Phase 2 — edge-tts (step 4 + timing for step 7)
 
-  4. Voiceover from cleaned script (no metadata, no citation markers)
-  7. Per-scene audio + scene_durations.json + captions.srt (word-synced)
+  4. Dual narrators — Emily primary, Andrew every 4th scene
+  7. Per-scene audio + word_timings.json for karaoke captions + captions.srt
 """
 
 from __future__ import annotations
@@ -15,31 +15,44 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
+from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import edge_tts
 
-from captions import merge_srt_blocks
+from captions import EMILY, ANDREW, estimate_word_timings, merge_srt_blocks, pick_narrator_voice
 from common import CONFIG, clean_script_for_tts, load_json, save_json, split_script_for_scenes
+
+DEFAULT_VOICES = [EMILY, ANDREW]
 
 
 async def synthesize_with_captions(
     text: str, voice: str, rate: str, dest: Path
-) -> str:
-    """Synthesize MP3 and return SRT block for this segment (no timestamps in spoken text)."""
+) -> tuple[str, list[dict[str, Any]]]:
+    """Synthesize MP3; return SRT block + word timings for karaoke overlay."""
     if not text.strip():
         dest.write_bytes(b"")
-        return ""
-    communicate = edge_tts.Communicate(text, voice, rate=rate)
+        return "", []
+    communicate = edge_tts.Communicate(text, voice, rate=rate, boundary="WordBoundary")
     submaker = edge_tts.SubMaker()
+    words: list[dict[str, Any]] = []
     with dest.open("wb") as audio_file:
         async for chunk in communicate.stream():
             if chunk["type"] == "audio":
                 audio_file.write(chunk["data"])
             elif chunk["type"] == "WordBoundary":
                 submaker.feed(chunk)
-    return submaker.get_srt()
+                start = chunk["offset"] / 10_000_000
+                duration = chunk["duration"] / 10_000_000
+                words.append(
+                    {
+                        "text": chunk["text"],
+                        "start": round(start, 4),
+                        "end": round(start + duration, 4),
+                    }
+                )
+    return submaker.get_srt(), words
 
 
 def concat_audio(parts: list[Path], output: Path) -> None:
@@ -78,7 +91,7 @@ def probe_duration(path: Path) -> float:
 async def run_phase(
     input_dir: Path,
     output_dir: Path,
-    voice: str,
+    voices: list[str],
     rate: str,
 ) -> None:
     script = clean_script_for_tts((input_dir / "script.txt").read_text(encoding="utf-8"))
@@ -104,6 +117,7 @@ async def run_phase(
     part_files: list[Path] = []
     srt_blocks: list[str] = []
     offsets: list[float] = []
+    word_timings: list[dict] = []
     clock = 0.0
 
     with tempfile.TemporaryDirectory() as tmp:
@@ -111,12 +125,21 @@ async def run_phase(
         for i, item in enumerate(scenes_meta):
             sid = int(item["scene_id"])
             text = segments[i] if i < len(segments) else ""
+            voice = pick_narrator_voice(i, voices, text)
             part = tmp_path / f"scene_{sid:02d}.mp3"
-            srt = await synthesize_with_captions(text, voice, rate, part)
+            srt, words = await synthesize_with_captions(text, voice, rate, part)
             dur = probe_duration(part)
+            if text.strip() and not words:
+                words = estimate_word_timings(text, dur)
             durations.append(
-                {"scene_id": sid, "duration_sec": round(dur, 3), "file": f"scene_{sid:02d}.png"}
+                {
+                    "scene_id": sid,
+                    "duration_sec": round(dur, 3),
+                    "file": f"scene_{sid:02d}.png",
+                    "voice": voice,
+                }
             )
+            word_timings.append({"scene_id": sid, "voice": voice, "words": words})
             part_files.append(part)
             srt_blocks.append(srt)
             offsets.append(clock)
@@ -125,6 +148,7 @@ async def run_phase(
         concat_audio(part_files, narration)
 
     save_json(output_dir / "scene_durations.json", durations)
+    save_json(output_dir / "word_timings.json", word_timings)
     srt_full = merge_srt_blocks(srt_blocks, offsets)
     (output_dir / "captions.srt").write_text(srt_full, encoding="utf-8")
 
@@ -136,7 +160,7 @@ async def run_phase(
 
     meta = load_json(input_dir / "metadata.json") if (input_dir / "metadata.json").exists() else {}
     meta["total_audio_sec"] = round(sum(d["duration_sec"] for d in durations), 3)
-    meta["tts_voice"] = voice
+    meta["tts_voices"] = voices
     target = meta.get("duration_minutes", 0) * 60
     if target:
         meta["duration_drift_sec"] = round(meta["total_audio_sec"] - target, 1)
@@ -148,20 +172,21 @@ def main() -> None:
     parser.add_argument("--input", type=Path, default=Path("output"))
     parser.add_argument("--output", type=Path, default=Path("output"))
     parser.add_argument("--pipeline", type=Path, default=CONFIG / "pipeline.json")
-    parser.add_argument("--voice", default=None)
     parser.add_argument("--rate", default=None)
     args = parser.parse_args()
 
     pipeline = load_json(args.pipeline) if args.pipeline.exists() else {}
-    voice = args.voice or os.environ.get("TTS_VOICE") or pipeline.get("tts_voice", "en-US-ChristopherNeural")
-    rate = args.rate or os.environ.get("TTS_RATE") or pipeline.get("tts_rate", "-5%")
+    voices = pipeline.get("tts_voices") or DEFAULT_VOICES
+    if isinstance(voices, str):
+        voices = [voices]
+    rate = os.environ.get("TTS_RATE") or pipeline.get("tts_rate", "-5%")
 
     try:
-        asyncio.run(run_phase(args.input, args.output, voice, rate))
+        asyncio.run(run_phase(args.input, args.output, voices, rate))
     except Exception as exc:
         print(exc, file=sys.stderr)
         sys.exit(1)
-    print(f"Wrote narration.mp3 + captions.srt + scene_durations.json -> {args.output}")
+    print(f"Wrote narration.mp3 + word_timings.json + captions.srt -> {args.output}")
 
 
 if __name__ == "__main__":

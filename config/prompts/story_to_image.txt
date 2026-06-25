@@ -29,12 +29,15 @@ Output rules:
 First line only: Total Parts: X
 
 Do NOT prefix prompts with "Answer:", numbering, bullets, or Part labels.
+Never output conversation IDs, "New conversation:", or UUID strings as prompts.
 
 Then generate exactly 20 prompts in Part 1
 
 Leave one blank line between every prompt
 
 Each prompt must describe one clear visual moment only
+
+Do not add text captions, titles, or subtitle overlays in the image unless the script explicitly requires on-screen labels
 
 Do not combine scenes into one long paragraph
 

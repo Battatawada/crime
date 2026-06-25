@@ -26,6 +26,7 @@ from common import (
     extract_notebook_id,
     extract_source_id,
     fallback_seo,
+    is_valid_image_prompt,
     load_json,
     load_prompt,
     new_run_id,
@@ -99,12 +100,12 @@ def collect_multipart_text(
 ) -> tuple[str, int]:
     first = ask(notebook_id, initial_prompt, new=new)
     total = parse_total_parts(first)
-    chunks = [strip_total_parts_header(strip_markdown(first))]
+    chunks = [clean_script_for_tts(strip_total_parts_header(strip_markdown(first)))]
 
     for part_num in range(2, total + 1):
         print(f"  Story part {part_num}/{total}...", flush=True)
         cont = ask(notebook_id, continue_word)
-        chunks.append(strip_total_parts_header(strip_markdown(cont)))
+        chunks.append(clean_script_for_tts(strip_total_parts_header(strip_markdown(cont))))
 
     return "\n\n".join(c for c in chunks if c), total
 
@@ -197,6 +198,11 @@ def main() -> None:
             prompt_lines = dedupe_prompts(prompt_lines)
             if len(prompt_lines) < before:
                 print(f"  Deduped {before - len(prompt_lines)} repeated prompts", flush=True)
+
+        before_filter = len(prompt_lines)
+        prompt_lines = [p for p in prompt_lines if is_valid_image_prompt(p)]
+        if len(prompt_lines) < before_filter:
+            print(f"  Dropped {before_filter - len(prompt_lines)} junk image prompts", flush=True)
 
         max_scenes = int(pipeline.get("max_scenes", 60))
         before_cap = len(prompt_lines)
