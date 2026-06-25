@@ -158,6 +158,9 @@ def is_transient_notebooklm_error(message: str) -> bool:
             "rate limit",
         )
     )
+
+
+def run_cmd(args: list[str], *, env: dict[str, str] | None = None, check: bool = True) -> subprocess.CompletedProcess[str]:
     merged = os.environ.copy()
     if env:
         merged.update(env)
