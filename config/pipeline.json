@@ -7,6 +7,9 @@
   "words_per_minute": 140,
   "dedupe_image_prompts": true,
   "max_scenes": 60,
+  "source_request_timeout": 120,
+  "source_wait_timeout": 900,
+  "source_add_delay_sec": 5,
   "tts_voices": ["en-IE-EmilyNeural", "en-US-AndrewMultilingualNeural"],
   "tts_rate": "-5%",
   "max_zoom": 1.0

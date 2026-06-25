@@ -141,7 +141,23 @@ def split_script_scenes(script: str) -> list[tuple[int, str]]:
     return scenes
 
 
-def run_cmd(args: list[str], *, env: dict[str, str] | None = None, check: bool = True) -> subprocess.CompletedProcess[str]:
+def is_transient_notebooklm_error(message: str) -> bool:
+    """True for network/RPC timeouts that are worth retrying on CI."""
+    lower = message.lower()
+    return any(
+        s in lower
+        for s in (
+            "get_notebook",
+            "network error",
+            "timed out",
+            "timeout",
+            "transportservererror",
+            "server-error retries exhausted",
+            "connection reset",
+            "temporarily unavailable",
+            "rate limit",
+        )
+    )
     merged = os.environ.copy()
     if env:
         merged.update(env)

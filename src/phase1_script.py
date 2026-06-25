@@ -28,6 +28,7 @@ from common import (
     extract_source_id,
     fallback_seo,
     is_valid_image_prompt,
+    is_transient_notebooklm_error,
     load_json,
     load_prompt,
     new_run_id,
@@ -43,17 +44,47 @@ from common import (
 )
 
 
-def wait_sources(notebook_id: str, source_ids: list[str], timeout: int = 600) -> None:
+def wait_sources(
+    notebook_id: str,
+    source_ids: list[str],
+    *,
+    timeout: int = 900,
+    max_attempts: int = 5,
+) -> None:
     import subprocess
 
-    for sid in source_ids:
-        result = subprocess.run(
-            ["notebooklm", "source", "wait", sid, "-n", notebook_id, "--timeout", str(timeout)],
-            capture_output=True,
-            text=True,
-        )
-        if result.returncode != 0:
-            raise RuntimeError(f"Source {sid} failed: {result.stderr}")
+    for idx, sid in enumerate(source_ids, start=1):
+        print(f"  Waiting for source {idx}/{len(source_ids)} ({sid[:8]}...)", flush=True)
+        last_err = ""
+        for attempt in range(max_attempts):
+            result = subprocess.run(
+                [
+                    "notebooklm",
+                    "source",
+                    "wait",
+                    sid,
+                    "-n",
+                    notebook_id,
+                    "--timeout",
+                    str(timeout),
+                    "--interval",
+                    "3",
+                ],
+                capture_output=True,
+                text=True,
+            )
+            if result.returncode == 0:
+                last_err = ""
+                break
+            last_err = (result.stderr or result.stdout or "source wait failed").strip()
+            if attempt + 1 < max_attempts and is_transient_notebooklm_error(last_err):
+                wait = 20 * (attempt + 1)
+                print(f"  Source wait retry {attempt + 2}/{max_attempts} in {wait}s...", flush=True)
+                time.sleep(wait)
+                continue
+            raise RuntimeError(f"Source {sid} failed: {last_err}")
+        if last_err:
+            raise RuntimeError(f"Source {sid} failed: {last_err}")
 
 
 def ask(notebook_id: str, prompt: str, *, new: bool = False, retries: int = 4) -> str:
@@ -193,10 +224,28 @@ def main() -> None:
         notebook_id = extract_notebook_id(created)
 
         source_ids: list[str] = []
-        for url in urls:
-            added = notebooklm_json("source", "add", url, "--notebook", notebook_id)
+        source_request_timeout = int(pipeline.get("source_request_timeout", 120))
+        source_add_delay = float(pipeline.get("source_add_delay_sec", 5))
+        for i, url in enumerate(urls):
+            if i:
+                time.sleep(source_add_delay)
+            print(f"  Adding source {i + 1}/{len(urls)}...", flush=True)
+            added = notebooklm_json(
+                "source",
+                "add",
+                url,
+                "--notebook",
+                notebook_id,
+                "--request-timeout",
+                str(source_request_timeout),
+            )
             source_ids.append(extract_source_id(added))
-        wait_sources(notebook_id, source_ids)
+        time.sleep(source_add_delay)
+        wait_sources(
+            notebook_id,
+            source_ids,
+            timeout=int(pipeline.get("source_wait_timeout", 900)),
+        )
 
         print("[Step 1–2] Topics...", flush=True)
         topics_raw = ask(notebook_id, load_prompt("topics_finding.txt"), new=True)
