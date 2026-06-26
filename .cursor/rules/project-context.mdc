@@ -1,0 +1,15 @@
+---
+description: Load local project context.md first every session
+alwaysApply: true
+---
+
+# Project context (always read first)
+
+At the **start of every conversation** in this repo:
+
+1. **Read `context.md`** in the repository root before planning or editing code.
+2. Treat it as the source of truth for VPS access, pipeline phases, secrets, and current run state.
+3. If `context.md` is missing, tell the user to copy from a backup or recreate it from `README.md` + `PIPELINE-PLAN.md`.
+4. After significant pipeline/VPS/workflow changes, **update `context.md`** (it is gitignored — local handoff only).
+
+Do not skip this step even if the user message seems narrow.
