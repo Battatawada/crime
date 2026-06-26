@@ -21,7 +21,7 @@ RETRYABLE_STATUS = {429, 500, 502, 503, 504}
 def _backoff_seconds(status: int, attempt: int) -> float:
     """429 needs long pauses — Google Flow throttles after ~40 rapid generations."""
     if status == 429:
-        return min(300.0, 90.0 * (attempt + 1))
+        return min(600.0, 120.0 * (attempt + 1))
     return min(60.0, 10.0 * (attempt + 1))
 
 

@@ -121,6 +121,11 @@ class SequentialGenerator:
         state["total_scenes"] = len(scenes)
         if resuming:
             state["error"] = None
+            state["failed_scenes"] = []
+            cooldown = int(os.environ.get("FLOW_RESUME_COOLDOWN_SEC", "600"))
+            if cooldown > 0:
+                print(f"Resume cooldown {cooldown}s (Flow 429 recovery)", flush=True)
+                time.sleep(cooldown)
             print(f"Resuming run {self.run_id} from {state.get('images_ready', 0)}/{len(scenes)} images", flush=True)
         self._save_state(state)
 
@@ -180,6 +185,12 @@ class SequentialGenerator:
                         state["last_saved"] = filename
                         self._save_state(state)
                     continue
+
+                # Flow rate-limits after ~40 images — brief cooldown before next batch
+                batch_cooldown = int(os.environ.get("FLOW_BATCH_COOLDOWN_SEC", "300"))
+                if batch_cooldown > 0 and scene_id > 1 and (scene_id - 1) % 40 == 0:
+                    print(f"Batch cooldown {batch_cooldown}s before scene {scene_id}", flush=True)
+                    time.sleep(batch_cooldown)
 
                 entity_refs = scene.get("entity_refs") or []
                 media_inputs = [ref_media[r] for r in entity_refs if r in ref_media]
