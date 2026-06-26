@@ -15,14 +15,21 @@ _UUID_RE = re.compile(
     re.IGNORECASE,
 )
 
-RETRYABLE_STATUS = {500, 502, 503, 504}
+RETRYABLE_STATUS = {429, 500, 502, 503, 504}
+
+
+def _backoff_seconds(status: int, attempt: int) -> float:
+    """429 needs long pauses — Google Flow throttles after ~40 rapid generations."""
+    if status == 429:
+        return min(300.0, 90.0 * (attempt + 1))
+    return min(60.0, 10.0 * (attempt + 1))
 
 
 class FlowKitClient:
     def __init__(self, base_url: str | None = None, timeout: float = 120.0) -> None:
         self.base_url = (base_url or os.environ.get("FLOWKIT_BASE_URL", "http://127.0.0.1:8100")).rstrip("/")
         self.timeout = timeout
-        self.max_retries = int(os.environ.get("FLOWKIT_API_RETRIES", "6"))
+        self.max_retries = int(os.environ.get("FLOWKIT_API_RETRIES", "10"))
 
     def health(self) -> dict[str, Any]:
         with httpx.Client(timeout=self.timeout) as client:
@@ -76,20 +83,21 @@ class FlowKitClient:
                     resp = client.request(method, f"{self.base_url}{path}", json=json_body)
                 if resp.status_code in RETRYABLE_STATUS and attempt + 1 < attempts:
                     last_err = f"{resp.status_code} {resp.text[:300]}"
-                    time.sleep(min(60, 10 * (attempt + 1)))
+                    time.sleep(_backoff_seconds(resp.status_code, attempt))
                     continue
                 resp.raise_for_status()
                 return resp.json()
             except httpx.HTTPStatusError as exc:
-                if exc.response.status_code in RETRYABLE_STATUS and attempt + 1 < attempts:
-                    last_err = f"{exc.response.status_code} {exc.response.text[:300]}"
-                    time.sleep(min(60, 10 * (attempt + 1)))
+                code = exc.response.status_code
+                if code in RETRYABLE_STATUS and attempt + 1 < attempts:
+                    last_err = f"{code} {exc.response.text[:300]}"
+                    time.sleep(_backoff_seconds(code, attempt))
                     continue
                 raise
             except httpx.RequestError as exc:
                 last_err = str(exc)
                 if attempt + 1 < attempts:
-                    time.sleep(min(60, 10 * (attempt + 1)))
+                    time.sleep(_backoff_seconds(0, attempt))
                     continue
                 raise RuntimeError(f"FlowKit request failed: {last_err}") from exc
         raise RuntimeError(f"FlowKit request failed after {attempts} attempts: {last_err}")
@@ -180,7 +188,9 @@ class FlowKitClient:
         if ref_media_ids:
             body["character_media_ids"] = ref_media_ids
 
-        data = self._request_json("POST", "/api/flow/generate-image", json_body=body)
+        data = self._request_json(
+            "POST", "/api/flow/generate-image", json_body=body, retries=self.max_retries
+        )
         image_url, media_id = self._extract_image_url(data)
         if not image_url and media_id:
             image_url = self.get_media_url(media_id)

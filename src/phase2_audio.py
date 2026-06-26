@@ -202,6 +202,29 @@ async def run_phase(
          for i, s in enumerate(scenes_meta)],
     )
 
+    pipeline_path = CONFIG / "pipeline.json"
+    pipeline = load_json(pipeline_path) if pipeline_path.exists() else {}
+    end_cfg = pipeline.get("end_card", {})
+    if end_cfg.get("enabled", True):
+        end_script = end_cfg.get(
+            "script",
+            "If you enjoyed this video, please consider subscribing. "
+            "It really helps us create more psychology stories for you. Thank you for watching.",
+        )
+        end_voice = resolve_voice(end_cfg.get("voice", voices[0]))
+        end_path = output_dir / "end_card.mp3"
+        await synthesize_with_captions(end_script, end_voice, rate, end_path)
+        save_json(
+            output_dir / "end_card.json",
+            {
+                "enabled": True,
+                "image": end_cfg.get("image", "config/end_card/subscribe.png"),
+                "duration_sec": round(probe_duration(end_path), 3),
+                "script": end_script,
+            },
+        )
+        print(f"Wrote end_card.mp3 ({probe_duration(end_path):.1f}s)", flush=True)
+
     meta = load_json(input_dir / "metadata.json") if (input_dir / "metadata.json").exists() else {}
     meta["total_audio_sec"] = round(sum(d["duration_sec"] for d in durations), 3)
     meta["tts_voices"] = voices

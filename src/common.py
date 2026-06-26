@@ -382,9 +382,21 @@ def is_valid_image_prompt(line: str, *, min_words: int = 8) -> bool:
         return False
     if re.match(r"^total parts:\s*\d+", cleaned, re.IGNORECASE):
         return False
+    if re.match(r"^scene\s+\d+\b", cleaned, re.IGNORECASE):
+        return False
+    if re.search(r"\bscene\s+\d+\b.*\blearning\b", cleaned, re.IGNORECASE):
+        return False
     if len(cleaned.split()) < min_words:
         return False
     return True
+
+
+def strip_prompt_labels(prompt: str) -> str:
+    """Remove Flow-prone title prefixes from image prompts."""
+    p = " ".join(prompt.split()).strip()
+    p = re.sub(r"(?i)^scene\s+\d+\s*[:\-]?\s*", "", p)
+    p = re.sub(r"(?i)\b(scene|chapter|part)\s+\d+\s*title\s*[:\-]?\s*", "", p)
+    return p.strip()
 
 
 def cap_scenes(prompts: list[str], max_scenes: int) -> list[str]:
@@ -417,6 +429,7 @@ def split_script_for_scenes(script: str, num_scenes: int) -> list[str]:
     """
     Split narration into N sequential chunks for per-scene TTS.
     Image prompt i aligns with audio chunk i → editor-accurate timing.
+    Distributes words evenly — no empty trailing scenes.
     """
     if num_scenes < 1:
         raise ValueError("num_scenes must be >= 1")
@@ -429,12 +442,25 @@ def split_script_for_scenes(script: str, num_scenes: int) -> list[str]:
     if not sentences:
         return [text] + [""] * (num_scenes - 1)
 
+    # Fewer sentences than scenes: split by word budget (avoid rapid empty tail clips)
+    if len(sentences) < num_scenes:
+        words = text.split()
+        if not words:
+            return [""] * num_scenes
+        words_per = len(words) / num_scenes
+        chunks: list[str] = []
+        for i in range(num_scenes):
+            a = int(i * words_per)
+            b = len(words) if i == num_scenes - 1 else int((i + 1) * words_per)
+            chunks.append(" ".join(words[a:b]))
+        return chunks
+
     if len(sentences) <= num_scenes:
         return sentences + [""] * (num_scenes - len(sentences))
 
     total_words = sum(len(s.split()) for s in sentences)
     words_per_chunk = total_words / num_scenes
-    chunks: list[str] = []
+    chunks = []
     current: list[str] = []
     word_count = 0
 

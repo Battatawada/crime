@@ -9,6 +9,8 @@ venv/
 *.mp3
 *.mp4
 *.png
+!config/end_card/subscribe.png
+!config/references/*.png
 *.vtt
 !.gitkeep
 ssh-key-*.key

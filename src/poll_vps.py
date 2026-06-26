@@ -54,12 +54,25 @@ def main() -> None:
 
         if status == "failed":
             err = data.get("error") or "unknown error"
-            if "502" in str(err):
+            err_lower = str(err).lower()
+            if "429" in str(err):
                 err += (
-                    " — FlowKit Chrome extension offline. On VPS (VNC): "
-                    "start-chrome-flowkit, open labs.google/fx/tools/flow, "
-                    "then bash /opt/niche/scripts/vps-preflight.sh"
+                    " — Google Flow rate limit. Re-trigger with same run_id to resume "
+                    "(40+ images already saved). SCENE_DELAY_SECONDS=30 helps avoid this."
                 )
+            elif "502" in str(err):
+                if "unauthorized" in err_lower or "401" in str(err):
+                    err += (
+                        " — Google Flow login expired. On VPS via VNC: open Chrome, "
+                        "go to https://labs.google/fx/tools/flow, sign in again, "
+                        "then bash /opt/niche/scripts/vps-preflight.sh"
+                    )
+                else:
+                    err += (
+                        " — FlowKit bridge error. On VPS (VNC): "
+                        "start-chrome-flowkit, open labs.google/fx/tools/flow, "
+                        "then bash /opt/niche/scripts/vps-preflight.sh"
+                    )
             sys.exit(f"VPS job failed: {err}")
 
         if status == "running" and ready > 0:

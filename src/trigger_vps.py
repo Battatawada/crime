@@ -19,6 +19,11 @@ def main() -> None:
     parser.add_argument("--entities", type=Path, default=Path("output/entities.json"))
     parser.add_argument("--metadata", type=Path, default=Path("output/metadata.json"))
     parser.add_argument("--run-id", default=None)
+    parser.add_argument(
+        "--resume",
+        action="store_true",
+        help="Resume failed run (uses saved scenes on VPS; requires --run-id)",
+    )
     args = parser.parse_args()
 
     base = os.environ.get("VPS_URL", "").rstrip("/")
@@ -31,6 +36,22 @@ def main() -> None:
         run_id = load_json(args.metadata).get("run_id")
     run_id = run_id or new_run_id()
 
+    headers = {"Authorization": f"Bearer {secret}"}
+    if args.resume:
+        if not args.run_id:
+            sys.exit("--resume requires --run-id")
+        data = httpx_post_json_with_retry(
+            f"{base}/runs/{run_id}/resume",
+            json_body={},
+            headers=headers,
+            timeout=180.0,
+            retries=5,
+        )
+        append_github_output("run_id", run_id)
+        print(f"run_id={run_id}")
+        print(data)
+        return
+
     payload = {
         "run_id": run_id,
         "scenes": load_json(args.scenes),
@@ -40,7 +61,7 @@ def main() -> None:
     data = httpx_post_json_with_retry(
         f"{base}/generate",
         json_body=payload,
-        headers={"Authorization": f"Bearer {secret}"},
+        headers=headers,
         timeout=180.0,
         retries=5,
     )

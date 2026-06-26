@@ -12,5 +12,11 @@
   "source_add_delay_sec": 5,
   "tts_voices": ["en-IE-EmilyNeural", "en-US-AndrewMultilingualNeural"],
   "tts_rate": "-5%",
-  "max_zoom": 1.0
+  "max_zoom": 1.0,
+  "end_card": {
+    "enabled": true,
+    "image": "config/end_card/subscribe.png",
+    "script": "If you enjoyed this video, please consider subscribing. It really helps us create more psychology stories for you. Thank you for watching.",
+    "voice": "en-IE-EmilyNeural"
+  }
 }

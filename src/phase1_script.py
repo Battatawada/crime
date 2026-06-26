@@ -39,6 +39,7 @@ from common import (
     parse_total_parts,
     prompts_to_scenes,
     save_json,
+    strip_prompt_labels,
     split_script_for_scenes,
     strip_markdown,
     strip_total_parts_header,
@@ -281,6 +282,7 @@ def main() -> None:
                 print(f"  Deduped {before - len(prompt_lines)} repeated prompts", flush=True)
 
         before_filter = len(prompt_lines)
+        prompt_lines = [strip_prompt_labels(p) for p in prompt_lines]
         prompt_lines = [p for p in prompt_lines if is_valid_image_prompt(p)]
         if len(prompt_lines) < before_filter:
             print(f"  Dropped {before_filter - len(prompt_lines)} junk image prompts", flush=True)

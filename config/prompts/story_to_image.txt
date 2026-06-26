@@ -37,7 +37,9 @@ Leave one blank line between every prompt
 
 Each prompt must describe one clear visual moment only
 
-Do not add text captions, titles, or subtitle overlays in the image unless the script explicitly requires on-screen labels
+Do not add text captions, titles, scene numbers, or subtitle overlays in the image.
+
+Never write "Scene N", "Part N", chapter titles, or infographic headings as visible text in the image.
 
 Do not combine scenes into one long paragraph
 

@@ -75,6 +75,8 @@ jobs:
             output/scene_durations.json
             output/captions.srt
             output/word_timings.json
+            output/end_card.mp3
+            output/end_card.json
 
   wait-for-images:
     needs: script-and-audio

@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import re
 import subprocess
 import time
 from datetime import datetime, timezone
@@ -51,16 +52,24 @@ def _stop_flowkit_stack() -> None:
 def _sanitize_prompt(prompt: str, scene_id: int) -> str:
     cleaned = " ".join(str(prompt).split()).strip()
     lower = cleaned.lower()
+    # Drop scene-number title cards Flow tends to render as visible text
+    cleaned = re.sub(r"(?i)^scene\s+\d+\s*[:\-]?\s*", "", cleaned)
+    cleaned = re.sub(r"(?i)\b(scene|chapter|part)\s+\d+\s*title\s*[:\-]?\s*", "", cleaned)
     if (
         len(cleaned.split()) >= 8
         and not lower.startswith("answer:")
         and "total parts:" not in lower
         and not lower.startswith("part ")
+        and not re.match(r"^scene\s+\d+\b", lower)
     ):
+        suffix = ", no visible text, no labels, no scene numbers, no titles"
+        if "no visible text" not in lower:
+            cleaned += suffix
         return cleaned
     return (
         "Minimalist stick figure line art, consistent circular-head character, "
-        f"cream background, scene {scene_id}, educational psychology mood"
+        "cream background, calm educational psychology mood, "
+        "no visible text, no labels, no scene numbers"
     )
 
 
@@ -76,8 +85,8 @@ class SequentialGenerator:
         self.images_dir = runs_dir / run_id / "images"
         self.state_path = runs_dir / run_id / "state.json"
         self.on_progress = on_progress or (lambda _: None)
-        self.delay = int(os.environ.get("SCENE_DELAY_SECONDS", "15"))
-        self.max_retries = int(os.environ.get("SCENE_MAX_RETRIES", "3"))
+        self.delay = int(os.environ.get("SCENE_DELAY_SECONDS", "25"))
+        self.max_retries = int(os.environ.get("SCENE_MAX_RETRIES", "5"))
         self.client = FlowKitClient()
 
     def _load_state(self) -> dict[str, Any]:
@@ -103,38 +112,54 @@ class SequentialGenerator:
 
     def run(self, scenes: list[dict[str, Any]], entities: list[dict[str, Any]] | None = None) -> None:
         state = self._load_state()
+        resuming = (
+            state.get("status") == "failed"
+            and int(state.get("images_ready", 0)) > 0
+            and int(state.get("images_ready", 0)) < len(scenes)
+        )
         state["status"] = "running"
         state["total_scenes"] = len(scenes)
+        if resuming:
+            state["error"] = None
+            print(f"Resuming run {self.run_id} from {state.get('images_ready', 0)}/{len(scenes)} images", flush=True)
         self._save_state(state)
 
         _start_flowkit_stack()
         try:
             self.client.ensure_ready()
-            state["phase"] = "project"
-            self._save_state(state)
 
-            project_id = None
-            for attempt in range(4):
-                try:
-                    project_id = self.client.create_project(title=f"Niche {self.run_id}", story="")
-                    break
-                except Exception as exc:  # noqa: BLE001
-                    if attempt >= 3:
-                        raise
-                    state["error"] = f"create_project retry {attempt + 1}: {exc}"
-                    self._save_state(state)
-                    _restart_flowkit_stack()
-                    self.client.ensure_ready(wait_sec=180)
-                    time.sleep(15 * (attempt + 1))
+            project_id = state.get("project_id")
+            ref_media = state.get("ref_media") or {}
+
             if not project_id:
-                raise RuntimeError("create_project failed after retries")
+                state["phase"] = "project"
+                self._save_state(state)
+                for attempt in range(4):
+                    try:
+                        project_id = self.client.create_project(title=f"Niche {self.run_id}", story="")
+                        state["project_id"] = project_id
+                        self._save_state(state)
+                        break
+                    except Exception as exc:  # noqa: BLE001
+                        if attempt >= 3:
+                            raise
+                        state["error"] = f"create_project retry {attempt + 1}: {exc}"
+                        self._save_state(state)
+                        _restart_flowkit_stack()
+                        self.client.ensure_ready(wait_sec=180)
+                        time.sleep(15 * (attempt + 1))
+                if not project_id:
+                    raise RuntimeError("create_project failed after retries")
 
-            state["phase"] = "refs"
-            self._save_state(state)
+            if not ref_media:
+                state["phase"] = "refs"
+                self._save_state(state)
+                refs_dir = refs_dir_from_env()
+                verify_references(refs_dir)
+                ref_media = upload_references(refs_dir, self.client, project_id=project_id)
+                state["ref_media"] = ref_media
+                self._save_state(state)
 
-            refs_dir = refs_dir_from_env()
-            verify_references(refs_dir)
-            ref_media = upload_references(refs_dir, self.client, project_id=project_id)
             video_id = project_id  # FlowKit ties scenes to project context
 
             state["phase"] = "scenes"
@@ -181,13 +206,20 @@ class SequentialGenerator:
                     except Exception as exc:  # noqa: BLE001
                         last_err = str(exc)
                         prompt = _rewrite_prompt_safe(scene.get("prompt", ""))
+                        is_rate_limit = "429" in last_err
+                        wait = (120 * attempt) if is_rate_limit else self.delay
                         if attempt == self.max_retries:
                             state["status"] = "failed"
                             state["error"] = f"Scene {scene_id}: {last_err}"
                             state["failed_scenes"].append(scene_id)
                             self._save_state(state)
                             raise
-                        time.sleep(self.delay)
+                        print(
+                            f"Scene {scene_id} retry {attempt}/{self.max_retries} "
+                            f"({'rate limit' if is_rate_limit else 'error'}), wait {wait}s",
+                            flush=True,
+                        )
+                        time.sleep(wait)
 
                 time.sleep(self.delay)
 

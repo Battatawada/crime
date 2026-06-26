@@ -100,6 +100,50 @@ def render_clip(
     kb.unlink(missing_ok=True)
 
 
+def _probe_duration(path: Path) -> float:
+    result = subprocess.run(
+        [
+            "ffprobe", "-v", "error",
+            "-show_entries", "format=duration",
+            "-of", "default=noprint_wrappers=1:nokey=1",
+            str(path),
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return max(0.5, float(result.stdout.strip()))
+
+
+def _ensure_end_card_image(work: Path, script: str) -> Path:
+    """Generate a consistent subscribe slide if config/end_card/subscribe.png is missing."""
+    dest = work / "end_card_subscribe.png"
+    line1 = "If you enjoyed this video,"
+    line2 = "please consider subscribing"
+    line3 = "Thank you for watching"
+    if script:
+        parts = [p.strip() for p in script.replace("!", ".").split(".") if p.strip()]
+        if parts:
+            line2 = parts[0][:55]
+        if len(parts) > 1:
+            line3 = parts[-1][:55]
+    text_filter = (
+        f"drawtext=text='{line1}':fontcolor=0x2C3E50:fontsize=56:"
+        f"x=(w-text_w)/2:y=h*0.38:fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf,"
+        f"drawtext=text='{line2}':fontcolor=0x2C3E50:fontsize=48:"
+        f"x=(w-text_w)/2:y=h*0.48:fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf,"
+        f"drawtext=text='{line3}':fontcolor=0x5D6D7E:fontsize=40:"
+        f"x=(w-text_w)/2:y=h*0.58:fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
+    )
+    _run(
+        [
+            "ffmpeg", "-y", "-f", "lavfi", "-i", f"color=c={BG_COLOR}:s=1920x1080:d=1",
+            "-vf", text_filter, "-frames:v", "1", str(dest),
+        ]
+    )
+    return dest
+
+
 def _find_fonts_dir() -> Path | None:
     candidates = [
         Path("/usr/share/fonts/truetype/dejavu"),
@@ -110,6 +154,10 @@ def _find_fonts_dir() -> Path | None:
         if c.is_dir():
             return c
     return None
+
+
+def probe_duration(path: Path) -> float:
+    return _probe_duration(path)
 
 
 def main() -> None:
@@ -184,9 +232,53 @@ def main() -> None:
 
     video_only = work / "video_only.mp4"
     _run(["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(list_file), "-c", "copy", str(video_only)])
+
+    narration_paths = [audio]
+    end_card_json = out / "end_card.json"
+    end_card_audio = out / "end_card.mp3"
+    end_card_clip: Path | None = None
+    if end_card_json.exists() and end_card_audio.exists():
+        end_meta = load_json(end_card_json)
+        if end_meta.get("enabled", True):
+            img_rel = end_meta.get("image", "config/end_card/subscribe.png")
+            img_path = Path(__file__).resolve().parents[1] / img_rel
+            if not img_path.exists():
+                img_path = _ensure_end_card_image(work, end_meta.get("script", ""))
+            dur = float(end_meta.get("duration_sec", probe_duration(end_card_audio)))
+            end_card_clip = work / "end_card.mp4"
+            render_clip(img_path, dur, None, end_card_clip, max_zoom=max_zoom, fonts_dir=fonts_dir)
+            combined = work / "video_with_end.mp4"
+            with (work / "concat_end.txt").open("w", encoding="utf-8") as f:
+                f.write(f"file '{video_only.resolve().as_posix()}'\n")
+                f.write(f"file '{end_card_clip.resolve().as_posix()}'\n")
+            _run(
+                [
+                    "ffmpeg", "-y", "-f", "concat", "-safe", "0",
+                    "-i", str(work / "concat_end.txt"), "-c", "copy", str(combined),
+                ]
+            )
+            video_only = combined
+            narration_paths.append(end_card_audio)
+
+    if len(narration_paths) == 1:
+        audio_in = str(audio)
+    else:
+        full_audio = work / "full_narration.mp3"
+        list_file = work / "audio_concat.txt"
+        with list_file.open("w", encoding="utf-8") as f:
+            for p in narration_paths:
+                f.write(f"file '{p.resolve().as_posix()}'\n")
+        _run(
+            [
+                "ffmpeg", "-y", "-f", "concat", "-safe", "0",
+                "-i", str(list_file), "-c", "copy", str(full_audio),
+            ]
+        )
+        audio_in = str(full_audio)
+
     _run(
         [
-            "ffmpeg", "-y", "-i", str(video_only), "-i", str(audio),
+            "ffmpeg", "-y", "-i", str(video_only), "-i", audio_in,
             "-c:v", "libx264", "-c:a", "aac", "-pix_fmt", "yuv420p",
             "-shortest", str(final),
         ]

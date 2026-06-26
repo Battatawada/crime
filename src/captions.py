@@ -31,7 +31,7 @@ WrapStyle: 0
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Karaoke,Arial Black,52,{white},&H000000FF,{black},&H80000000,1,0,0,0,100,100,0,0,1,4,0,2,80,80,72,1
+Style: Karaoke,Arial,36,{white},&H000000FF,{black},&H80000000,1,0,0,0,100,100,0,0,1,3,0,2,120,120,140,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -46,21 +46,47 @@ def ass_time(seconds: float) -> str:
     return f"{h}:{m:02d}:{s:02d}.{cs_rem:02d}"
 
 
+# Max words visible at once (sliding window around active word)
+KARAOKE_WINDOW = 7
+
+
 def _display_word(raw: str) -> str:
-    return re.sub(r"[^\w']+", "", raw).upper()
+    """Keep punctuation; avoid ALL CAPS wall-of-text."""
+    word = raw.strip()
+    if not word:
+        return ""
+    # Strip stray markdown but keep . , ? ! ' "
+    word = re.sub(r"^[^\w'\"]+|[^\w'\"?!.,]+$", "", word)
+    return word
+
+
+def _window_bounds(length: int, active_idx: int, window: int = KARAOKE_WINDOW) -> tuple[int, int]:
+    half = window // 2
+    start = max(0, active_idx - half)
+    end = min(length, start + window)
+    start = max(0, end - window)
+    return start, end
 
 
 def build_highlight_line(words: list[dict], active_idx: int) -> str:
+    """Show a short phrase around the active word — not the entire scene."""
+    start, end = _window_bounds(len(words), active_idx)
     parts: list[str] = []
-    for j, w in enumerate(words):
-        token = _display_word(w.get("text", ""))
+    for j in range(start, end):
+        token = _display_word(words[j].get("text", ""))
         if not token:
             continue
         if j == active_idx:
-            parts.append(f"{{\\1c{YELLOW}\\b1}}{token}{{\\1c{WHITE}\\b1}}")
+            parts.append(f"{{\\1c{YELLOW}\\b1}}{token}{{\\1c{WHITE}\\b0}}")
         else:
             parts.append(token)
-    return " ".join(parts) if parts else "..."
+    if not parts:
+        return "..."
+    # Soft line break near middle for long windows
+    if len(parts) >= 5:
+        mid = len(parts) // 2
+        return " ".join(parts[:mid]) + "\\N" + " ".join(parts[mid:])
+    return " ".join(parts)
 
 
 def estimate_word_timings(text: str, duration: float) -> list[dict]:

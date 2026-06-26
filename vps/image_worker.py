@@ -23,7 +23,7 @@ _jobs: dict[str, asyncio.Task] = {}
 
 class GeneratePayload(BaseModel):
     run_id: str
-    scenes: list[dict[str, Any]]
+    scenes: list[dict[str, Any]] = Field(default_factory=list)
     entities: list[dict[str, Any]] = Field(default_factory=list)
 
 
@@ -33,6 +33,29 @@ def verify_auth(request: Request) -> None:
     auth = request.headers.get("Authorization", "")
     if auth != f"Bearer {WEBHOOK_SECRET}":
         raise HTTPException(401, "Unauthorized")
+
+
+def _scenes_path(run_id: str) -> Path:
+    return RUNS_DIR / run_id / "scenes.json"
+
+
+def _save_scenes_payload(run_id: str, scenes: list[dict[str, Any]], entities: list[dict[str, Any]]) -> None:
+    import json
+
+    _scenes_path(run_id).write_text(
+        json.dumps({"scenes": scenes, "entities": entities}, indent=2),
+        encoding="utf-8",
+    )
+
+
+def _load_scenes_payload(run_id: str) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    import json
+
+    path = _scenes_path(run_id)
+    if not path.exists():
+        raise HTTPException(404, "No saved scenes for this run — POST scenes.json with /generate")
+    data = json.loads(path.read_text(encoding="utf-8"))
+    return data.get("scenes", []), data.get("entities", [])
 
 
 def _state_path(run_id: str) -> Path:
@@ -62,6 +85,8 @@ async def generate(
     payload: GeneratePayload,
     _: None = Depends(verify_auth),
 ) -> dict[str, str]:
+    import json
+
     run_id = payload.run_id
     if run_id in _jobs and not _jobs[run_id].done():
         return {"run_id": run_id, "status": "already_running"}
@@ -69,25 +94,74 @@ async def generate(
     RUNS_DIR.mkdir(parents=True, exist_ok=True)
     (RUNS_DIR / run_id / "images").mkdir(parents=True, exist_ok=True)
 
-    import json
+    scenes = payload.scenes
+    entities = payload.entities
+    if scenes:
+        _save_scenes_payload(run_id, scenes, entities)
+    else:
+        scenes, entities = _load_scenes_payload(run_id)
+
+    state_path = _state_path(run_id)
+    if state_path.exists():
+        existing = json.loads(state_path.read_text(encoding="utf-8"))
+        ready = int(existing.get("images_ready", 0))
+        total = int(existing.get("total_scenes", len(scenes)))
+        if existing.get("status") == "complete":
+            return {"run_id": run_id, "status": "already_complete"}
+        if existing.get("status") == "failed" and ready > 0 and ready < total:
+            existing["status"] = "pending"
+            existing["error"] = None
+            state_path.write_text(json.dumps(existing, indent=2), encoding="utf-8")
+            task = asyncio.create_task(_run_job(run_id, scenes, entities))
+            _jobs[run_id] = task
+            return {"run_id": run_id, "status": "resumed", "images_ready": str(ready)}
 
     initial = {
         "run_id": run_id,
         "status": "pending",
         "phase": "queued",
-        "total_scenes": len(payload.scenes),
+        "total_scenes": len(scenes),
         "images_ready": 0,
         "current_scene": 0,
         "completed": [],
         "failed_scenes": [],
         "error": None,
     }
-    _state_path(run_id).parent.mkdir(parents=True, exist_ok=True)
-    _state_path(run_id).write_text(json.dumps(initial, indent=2), encoding="utf-8")
+    state_path.parent.mkdir(parents=True, exist_ok=True)
+    state_path.write_text(json.dumps(initial, indent=2), encoding="utf-8")
 
-    task = asyncio.create_task(_run_job(run_id, payload.scenes, payload.entities))
+    task = asyncio.create_task(_run_job(run_id, scenes, entities))
     _jobs[run_id] = task
     return {"run_id": run_id, "status": "accepted"}
+
+
+@app.post("/runs/{run_id}/resume")
+async def resume_run(run_id: str, _: None = Depends(verify_auth)) -> dict[str, str]:
+    """Resume a failed run using saved scenes.json on disk (skips completed images)."""
+    import json
+
+    if run_id in _jobs and not _jobs[run_id].done():
+        return {"run_id": run_id, "status": "already_running"}
+
+    scenes, entities = _load_scenes_payload(run_id)
+    state_path = _state_path(run_id)
+    if not state_path.exists():
+        raise HTTPException(404, "Run not found")
+
+    existing = json.loads(state_path.read_text(encoding="utf-8"))
+    ready = int(existing.get("images_ready", 0))
+    total = int(existing.get("total_scenes", len(scenes)))
+    if existing.get("status") == "complete":
+        return {"run_id": run_id, "status": "already_complete"}
+    if ready >= total:
+        return {"run_id": run_id, "status": "already_complete"}
+
+    existing["status"] = "pending"
+    existing["error"] = None
+    state_path.write_text(json.dumps(existing, indent=2), encoding="utf-8")
+    task = asyncio.create_task(_run_job(run_id, scenes, entities))
+    _jobs[run_id] = task
+    return {"run_id": run_id, "status": "resumed", "images_ready": str(ready)}
 
 
 @app.get("/runs/{run_id}/status")
