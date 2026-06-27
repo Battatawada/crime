@@ -12,8 +12,10 @@ Phase 1 — NotebookLM (steps 1–3, 5, 8 of manual workflow)
 from __future__ import annotations
 
 import argparse
+import json
 import re
 import sys
+import tempfile
 import time
 from pathlib import Path
 
@@ -94,6 +96,21 @@ def wait_sources(
             raise RuntimeError(f"Source {sid} failed: {last_err}")
 
 
+def _parse_ask_response(raw_stdout: str) -> str:
+    text = raw_stdout.strip()
+    if not text:
+        return ""
+    if text.startswith("{"):
+        try:
+            data = json.loads(text)
+            answer = data.get("answer") or data.get("text") or ""
+            if isinstance(answer, str) and answer.strip():
+                return answer.strip()
+        except json.JSONDecodeError:
+            pass
+    return text
+
+
 def ask(
     notebook_id: str,
     prompt: str,
@@ -104,44 +121,60 @@ def ask(
 ) -> str:
     import subprocess
 
+    use_prompt_file = len(prompt) > 6000
+    prompt_file: Path | None = None
+    if use_prompt_file:
+        tmp = tempfile.NamedTemporaryFile(
+            mode="w", suffix=".txt", delete=False, encoding="utf-8"
+        )
+        tmp.write(prompt)
+        tmp.close()
+        prompt_file = Path(tmp.name)
+
     cmd = [
         "notebooklm",
         "ask",
-        prompt,
+        *(["--prompt-file", str(prompt_file)] if prompt_file else [prompt]),
         "--notebook",
         notebook_id,
         "--request-timeout",
         str(request_timeout),
+        "--json",
     ]
     if new:
         cmd.extend(["--new", "--yes"])
     last_err = ""
-    for attempt in range(retries):
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-        )
-        if result.returncode == 0 and result.stdout.strip():
-            return result.stdout.strip()
-        last_err = (result.stderr or result.stdout or "notebooklm ask failed").strip()
-        if attempt + 1 < retries and (
-            is_transient_notebooklm_error(last_err)
-            or any(
-                s in last_err.lower()
-                for s in (
-                    "parseable chunks",
-                    "empty response",
-                    "streaming chat",
-                )
+    try:
+        for attempt in range(retries):
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
             )
-        ):
-            wait = 8 * (attempt + 1)
-            print(f"  notebooklm ask retry {attempt + 2}/{retries} in {wait}s...", flush=True)
-            time.sleep(wait)
-            continue
-        break
+            answer = _parse_ask_response(result.stdout or "")
+            if result.returncode == 0 and answer:
+                return answer
+            last_err = (result.stderr or result.stdout or "notebooklm ask failed").strip()
+            if attempt + 1 < retries and (
+                is_transient_notebooklm_error(last_err)
+                or any(
+                    s in last_err.lower()
+                    for s in (
+                        "parseable chunks",
+                        "empty response",
+                        "streaming chat",
+                    )
+                )
+            ):
+                wait = 8 * (attempt + 1)
+                print(f"  notebooklm ask retry {attempt + 2}/{retries} in {wait}s...", flush=True)
+                time.sleep(wait)
+                continue
+            break
+    finally:
+        if prompt_file:
+            prompt_file.unlink(missing_ok=True)
     raise RuntimeError(last_err)
 
 
@@ -250,6 +283,49 @@ def build_image_prompt(
     return template.replace("{script_excerpt}", script_block)
 
 
+def collect_image_prompts_chunked(
+    notebook_id: str,
+    script: str,
+    *,
+    duration: int,
+    target_scene_count: int,
+    continue_word: str,
+    num_chunks: int = 3,
+) -> list[str]:
+    """Split script into chunks; fresh NotebookLM chat per chunk (most reliable)."""
+    words = script.split()
+    if not words:
+        return []
+    chunk_words = max(250, (len(words) + num_chunks - 1) // num_chunks)
+    chunks: list[str] = []
+    for i in range(0, len(words), chunk_words):
+        chunks.append(" ".join(words[i : i + chunk_words]))
+
+    per_chunk = max(8, (target_scene_count + len(chunks) - 1) // len(chunks))
+    all_prompts: list[str] = []
+    for idx, chunk in enumerate(chunks, start=1):
+        print(f"  Image chunk {idx}/{len(chunks)} (~{len(chunk.split())} words, {per_chunk} prompts)...", flush=True)
+        prompt = build_image_prompt(
+            chunk,
+            duration=duration,
+            target_scene_count=per_chunk,
+            embed_script=True,
+            max_script_chars=len(chunk) + 100,
+        )
+        lines = collect_all_image_prompts(
+            notebook_id,
+            prompt,
+            continue_word,
+            new=True,
+            retries=6,
+            request_timeout=300,
+        )
+        all_prompts.extend(lines)
+        if idx < len(chunks):
+            time.sleep(12)
+    return all_prompts
+
+
 def collect_image_prompts_resilient(
     notebook_id: str,
     script: str,
@@ -259,6 +335,7 @@ def collect_image_prompts_resilient(
     continue_word: str,
 ) -> list[str]:
     """Try story chat first (short ask), then fall back to embedded script chunks."""
+    time.sleep(12)
     strategies: list[tuple[str, bool, int]] = [
         ("story chat", False, 0),
         ("embedded script (4.5k chars)", True, 4500),
@@ -280,6 +357,8 @@ def collect_image_prompts_resilient(
                 prompt,
                 continue_word,
                 new=not embed,
+                retries=6,
+                request_timeout=300,
             )
             if len(lines) >= max(5, target_scene_count // 4):
                 print(f"  -> {len(lines)} prompts from {label}", flush=True)
@@ -288,7 +367,24 @@ def collect_image_prompts_resilient(
         except Exception as exc:  # noqa: BLE001
             last_err = str(exc)
             print(f"  Warning: {label} failed ({exc})", flush=True)
-            time.sleep(10)
+            time.sleep(12)
+
+    print("  Falling back to chunked script image prompts...", flush=True)
+    try:
+        lines = collect_image_prompts_chunked(
+            notebook_id,
+            script,
+            duration=duration,
+            target_scene_count=target_scene_count,
+            continue_word=continue_word,
+        )
+        if len(lines) >= 5:
+            print(f"  -> {len(lines)} prompts from chunked script", flush=True)
+            return lines
+    except Exception as exc:  # noqa: BLE001
+        last_err = str(exc)
+        print(f"  Warning: chunked script failed ({exc})", flush=True)
+
     raise RuntimeError(last_err or "Image prompt generation failed after all strategies")
 
 
@@ -392,21 +488,6 @@ def main() -> None:
             target_scene_count=target_scene_count,
             continue_word=continue_word,
         )
-        if len(prompt_lines) < max(5, target_scene_count // 3):
-            print("  Warning: very few image prompts, retrying with explicit count...", flush=True)
-            extra = build_image_prompt(
-                script,
-                duration=duration,
-                target_scene_count=target_scene_count,
-                embed_script=True,
-                max_script_chars=4500,
-            )
-            prompt_lines = collect_all_image_prompts(
-                notebook_id,
-                extra + f"\n\nGenerate at least {target_scene_count} distinct prompts aligned to the script.",
-                continue_word,
-                new=True,
-            )
 
         if pipeline.get("dedupe_image_prompts", True):
             before = len(prompt_lines)
