@@ -1,54 +1,26 @@
 Act as a scene-by-scene 'Minimalist Stick Figure Line Art' visual breakdown engine.
 
-Use ONLY the sources in this notebook. Do not summarize the story. Do not merge multiple moments into one visual. Break the script into the maximum number of distinct imageable scenes possible.
+Use ONLY the narration script below. Do not invent scenes after the script ends. Do not summarize.
+
+Target: exactly {target_scene_count} image prompts total (across all parts). One prompt per narrated beat — no filler, no recap montage at the end.
 
 Task:
+- Read the script carefully
+- Split into visual beats by action, emotion, location, or idea change
+- If one sentence has 2 visual moments, split into 2 prompts (still stay within {target_scene_count} total)
+- Do NOT exceed {target_scene_count} prompts — merge minor beats if needed
+- Do NOT generate extra prompts beyond the script's ending
 
-Read the script carefully.
+Style: Minimalist Stick Figure Line Art — ONE channel character (circular head, dot eyes, thin black limbs, cream/beige background). Match reference images. Infographic moments: teal/navy on beige.
 
-Split it into micro-scenes by action, emotion, object change, location change, time change, or idea change.
-
-Count every major sentence or clause that can be shown visually as a separate scene if needed.
-
-Prefer MORE scenes, not fewer scenes.
-
-If one sentence contains 2-3 visual moments, split them into 2-3 separate image prompts.
-
-Do not compress story beats into one prompt unless they are truly inseparable.
-
-For a {duration_minutes}-minute script, estimate the total scene count first, then generate prompts accordingly.
-
-Use Minimalist Stick Figure Line Art — ONE consistent channel character (circular head, dot eyes, thin black line limbs, cream/beige background). Match reference images: same stick-figure mascot in every scene. For diagram/education moments use clean flat infographic style (teal/navy on beige).
-
-Keep each image prompt around 40-50 words.
-
-Each prompt must be a single standalone line with no heading, no numbering, no bullets, no explanation.
+Each prompt: ~40-50 words, single standalone line, no numbering, no bullets.
 
 Output rules:
-
 First line only: Total Parts: X
-
-Do NOT prefix prompts with "Answer:", numbering, bullets, or Part labels.
-Never output conversation IDs, "New conversation:", or UUID strings as prompts.
-
-Then generate exactly 20 prompts in Part 1
-
-Leave one blank line between every prompt
-
-Each prompt must describe one clear visual moment only
-
-Do not add text captions, titles, scene numbers, or subtitle overlays in the image.
-
-Never write "Scene N", "Part N", chapter titles, or infographic headings as visible text in the image.
-
-Do not combine scenes into one long paragraph
-
-Do not add any extra text before or after the prompts
-
+Then exactly 20 prompts in Part 1 (or fewer if {target_scene_count} < 20)
+Blank line between prompts
+No visible text, scene numbers, or titles in the image
 Stop after Part 1 and wait for "Next"
 
-Important counting rule:
-If unsure whether a moment deserves its own image, split it into a separate prompt instead of merging it.
-When the script has dense narration, treat it as multiple visual beats, not one scene
-
-Use the complete story script from our conversation above as the source for scene breakdown.
+--- NARRATION SCRIPT ---
+{script_excerpt}

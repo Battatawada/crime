@@ -405,6 +405,91 @@ def cap_scenes(prompts: list[str], max_scenes: int) -> list[str]:
     return prompts
 
 
+def estimate_scene_count(script: str, pipeline: dict[str, Any] | None = None) -> int:
+    """Scene count from narration length — not from LLM prompt spam."""
+    pipeline = pipeline or {}
+    max_scenes = int(pipeline.get("max_scenes", 60))
+    min_scenes = int(pipeline.get("min_scenes", 10))
+    words_per_scene = int(pipeline.get("words_per_scene", 35))
+    text = clean_script_for_tts(script)
+    word_count = len(text.split())
+    if word_count < 1:
+        return min_scenes
+    n = max(min_scenes, round(word_count / max(1, words_per_scene)))
+    return min(max_scenes, n)
+
+
+def align_scenes_to_narration(
+    script: str,
+    prompts: list[str],
+    pipeline: dict[str, Any] | None = None,
+) -> tuple[list[str], list[str]]:
+    """
+    One image per narrated beat. Drop tail scenes that would be silent 0.35s flashes.
+    Returns (prompts, script_segments) with equal length.
+    """
+    pipeline = pipeline or {}
+    max_scenes = int(pipeline.get("max_scenes", 60))
+    min_words = int(pipeline.get("min_words_per_scene", 12))
+    text = clean_script_for_tts(script)
+    target = min(len(prompts), estimate_scene_count(text, pipeline), max_scenes)
+    target = max(1, target)
+    prompts = prompts[:target]
+    segments = split_script_for_scenes(text, len(prompts))
+
+    while len(segments) > 1 and len(segments[-1].split()) < min_words:
+        segments.pop()
+        prompts.pop()
+
+    if len(segments) != len(prompts):
+        segments = split_script_for_scenes(text, len(prompts))
+
+    return prompts, segments
+
+
+def load_topic_history(path: Path | None = None) -> list[dict[str, Any]]:
+    path = path or CONFIG / "topic_history.json"
+    if not path.exists():
+        return []
+    data = load_json(path)
+    if isinstance(data, dict):
+        return list(data.get("topics", []))
+    if isinstance(data, list):
+        return data
+    return []
+
+
+def format_topic_history_for_prompt(topics: list[dict[str, Any]], limit: int = 12) -> str:
+    if not topics:
+        return "(none yet — this is the first video)"
+    lines: list[str] = []
+    for row in topics[-limit:]:
+        title = row.get("title") or row.get("topic") or "Unknown"
+        run_id = row.get("run_id", "")
+        lines.append(f"- {title}" + (f" [{run_id}]" if run_id else ""))
+    return "\n".join(lines)
+
+
+def append_topic_history(
+    path: Path,
+    *,
+    run_id: str,
+    topic: str,
+    title: str,
+    max_entries: int = 30,
+) -> None:
+    existing = load_topic_history(path)
+    existing.append(
+        {
+            "run_id": run_id,
+            "topic": topic,
+            "title": title,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }
+    )
+    save_json(path, {"topics": existing[-max_entries:]})
+
+
 def prompts_to_scenes(prompts: list[str], entity_refs: list[str] | None = None) -> list[dict]:
     refs = entity_refs or ["character_A"]
     return [

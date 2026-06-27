@@ -25,6 +25,7 @@ class GeneratePayload(BaseModel):
     run_id: str
     scenes: list[dict[str, Any]] = Field(default_factory=list)
     entities: list[dict[str, Any]] = Field(default_factory=list)
+    thumbnail: dict[str, Any] | None = None
 
 
 def verify_auth(request: Request) -> None:
@@ -100,6 +101,13 @@ async def generate(
         _save_scenes_payload(run_id, scenes, entities)
     else:
         scenes, entities = _load_scenes_payload(run_id)
+
+    if payload.thumbnail:
+        import json
+
+        thumb_path = RUNS_DIR / run_id / "thumbnail.json"
+        thumb_path.parent.mkdir(parents=True, exist_ok=True)
+        thumb_path.write_text(json.dumps(payload.thumbnail, indent=2), encoding="utf-8")
 
     state_path = _state_path(run_id)
     if state_path.exists():

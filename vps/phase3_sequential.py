@@ -234,6 +234,8 @@ class SequentialGenerator:
 
                 time.sleep(self.delay)
 
+            self._generate_thumbnail_if_needed(state, project_id, video_id, ref_media)
+
             state["status"] = "complete"
             state["phase"] = "done"
             state["error"] = None
@@ -246,6 +248,59 @@ class SequentialGenerator:
             raise
         finally:
             _stop_flowkit_stack()
+
+    def _generate_thumbnail_if_needed(
+        self,
+        state: dict[str, Any],
+        project_id: str,
+        video_id: str,
+        ref_media: dict[str, str],
+    ) -> None:
+        thumb_json = self.state_path.parent / "thumbnail.json"
+        if not thumb_json.exists():
+            return
+        thumb_meta = json.loads(thumb_json.read_text(encoding="utf-8"))
+        prompt = str(thumb_meta.get("prompt", "")).strip()
+        if not prompt:
+            return
+
+        dest = self.images_dir / "thumbnail.png"
+        if dest.exists() and dest.stat().st_size > 10_000:
+            state["thumbnail_ready"] = True
+            self._save_state(state)
+            return
+
+        state["phase"] = "thumbnail"
+        self._save_state(state)
+        entity_refs = thumb_meta.get("entity_refs") or []
+        media_inputs = [ref_media[r] for r in entity_refs if r in ref_media]
+        prompt = _sanitize_prompt(prompt, 0)
+        prompt += ", YouTube thumbnail composition, bold focal subject, high contrast, no visible text"
+
+        for attempt in range(1, self.max_retries + 1):
+            try:
+                image_url, _ = self.client.generate_scene_image(
+                    project_id=project_id,
+                    scene_id="thumbnail",
+                    video_id=video_id,
+                    prompt=prompt,
+                    ref_media_ids=media_inputs,
+                )
+                self.client.download_url(image_url, dest)
+                if dest.stat().st_size < 10_000:
+                    raise RuntimeError(f"Thumbnail too small: {dest}")
+                state["thumbnail_ready"] = True
+                self._save_state(state)
+                print(f"Thumbnail saved {dest}", flush=True)
+                return
+            except Exception as exc:  # noqa: BLE001
+                is_rate_limit = "429" in str(exc)
+                wait = (120 * attempt) if is_rate_limit else self.delay
+                if attempt == self.max_retries:
+                    print(f"Thumbnail generation failed (non-fatal): {exc}", flush=True)
+                    return
+                print(f"Thumbnail retry {attempt}/{self.max_retries}, wait {wait}s", flush=True)
+                time.sleep(wait)
 
 
 async def run_generation_async(

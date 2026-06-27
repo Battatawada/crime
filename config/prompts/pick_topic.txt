@@ -1,4 +1,8 @@
-From the 10 topics you just listed above, pick the single best one for a brand-new YouTube channel in this niche.
+From the 10 topics you just listed, pick the single best NEXT video for this channel.
+
+Past videos already made (avoid same angle):
+{past_topics}
+
+Pick for: human curiosity, search + browse CTR, and fit with reference channel style (Entire X in Y mins psychology/motivation).
 
 Reply with ONLY the topic title on one line — no numbering, no explanation, no quotes.
-Do not start a new list; output only the chosen title.

@@ -57,6 +57,9 @@ def main() -> None:
         "scenes": load_json(args.scenes),
         "entities": load_json(args.entities) if args.entities.exists() else [],
     }
+    thumb_path = args.scenes.parent / "thumbnail.json"
+    if thumb_path.exists():
+        payload["thumbnail"] = load_json(thumb_path)
 
     data = httpx_post_json_with_retry(
         f"{base}/generate",

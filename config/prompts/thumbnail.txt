@@ -1,0 +1,13 @@
+Create ONE YouTube thumbnail image prompt for this video.
+
+Topic: {topic}
+Video title (for mood, do NOT render as readable text): {title}
+
+Study the reference channel sources in this notebook — match their thumbnail energy:
+- One bold stick-figure moment (close-up or strong pose)
+- Cream/beige background, high contrast, clean minimalist line art
+- Single clear visual metaphor for the topic (brain, phone, bed, gym, etc.)
+- Leave empty space at top third for title overlay (no letters, no words in the image)
+- Emotionally punchy, human curiosity — not generic stock art
+
+Output ONLY the image prompt as one standalone line (~45 words). No numbering, no quotes, no explanation.

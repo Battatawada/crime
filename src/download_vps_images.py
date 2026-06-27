@@ -53,7 +53,21 @@ def main() -> None:
             raise RuntimeError(f"Downloaded image too small: {dest} ({dest.stat().st_size} bytes)")
         print(f"saved {dest} ({dest.stat().st_size // 1024}KB)")
 
-    print(f"Downloaded {len(filenames)} images")
+    thumb_dest = args.output.parent / "thumbnail.png"
+    try:
+        httpx_download_with_retry(
+            f"{base}/runs/{args.run_id}/images/thumbnail.png",
+            thumb_dest,
+            headers=headers,
+            timeout=180.0,
+            retries=3,
+        )
+        if thumb_dest.stat().st_size >= 10_000:
+            print(f"saved {thumb_dest} ({thumb_dest.stat().st_size // 1024}KB)")
+    except Exception as exc:  # noqa: BLE001
+        print(f"thumbnail.png not available: {exc}")
+
+    print(f"Downloaded {len(filenames)} scene images")
 
 
 if __name__ == "__main__":

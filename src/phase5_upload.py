@@ -39,6 +39,7 @@ def main() -> None:
     parser.add_argument("--metadata", type=Path, default=Path("output/metadata.json"))
     parser.add_argument("--seo", type=Path, default=Path("output/youtube_seo.json"))
     parser.add_argument("--captions", type=Path, default=Path("output/captions.srt"))
+    parser.add_argument("--thumbnail", type=Path, default=Path("output/thumbnail.png"))
     args = parser.parse_args()
 
     for key in ("YOUTUBE_CLIENT_ID", "YOUTUBE_CLIENT_SECRET", "YOUTUBE_REFRESH_TOKEN"):
@@ -106,6 +107,14 @@ def main() -> None:
         print(json.dumps({"caption_id": cap_resp.get("id"), "language": "en"}))
     else:
         print("No captions.srt — skipped caption upload")
+
+    if args.thumbnail.exists() and args.thumbnail.stat().st_size >= 10_000:
+        thumb_media = MediaFileUpload(str(args.thumbnail), mimetype="image/png", resumable=True)
+        thumb_req = youtube.thumbnails().set(videoId=video_id, media_body=thumb_media)
+        thumb_resp = thumb_req.execute()
+        print(json.dumps({"thumbnail_upload": "ok", "items": len(thumb_resp.get("items", []))}))
+    else:
+        print("No thumbnail.png — skipped custom thumbnail upload")
 
 
 if __name__ == "__main__":

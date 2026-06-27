@@ -21,16 +21,21 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from common import (
     CONFIG,
+    align_scenes_to_narration,
+    append_topic_history,
     cap_scenes,
     clean_script_for_tts,
     dedupe_prompts,
+    estimate_scene_count,
     extract_notebook_id,
     extract_source_id,
     fallback_seo,
+    format_topic_history_for_prompt,
     is_valid_image_prompt,
     is_transient_notebooklm_error,
     load_json,
     load_prompt,
+    load_topic_history,
     new_run_id,
     notebooklm_json,
     notebooklm_json_with_retry,
@@ -136,9 +141,11 @@ def _first_topic_from_list(topics_raw: str) -> str:
     raise RuntimeError("Could not parse any topic from topics_list")
 
 
-def pick_topic(notebook_id: str, topics_raw: str) -> str:
+def pick_topic(notebook_id: str, topics_raw: str, past_topics: str) -> str:
     """Pick topic in the same NotebookLM chat as topics list (no --new)."""
-    prompt = f"{load_prompt('pick_topic.txt')}\n\nTopics:\n{topics_raw}"
+    prompt = (
+        f"{load_prompt('pick_topic.txt').replace('{past_topics}', past_topics)}\n\nTopics:\n{topics_raw}"
+    )
     try:
         raw = ask(notebook_id, prompt, new=False)
         line = raw.strip().splitlines()[0].strip()
@@ -202,6 +209,8 @@ def main() -> None:
     continue_word = pipeline.get("continue_keyword", "Next")
     target_words = duration * wpm
     notebook_id = ""
+    segments: list[str] = []
+    thumbnail_meta: dict | None = None
 
     if args.dry_run:
         script = (
@@ -215,6 +224,8 @@ def main() -> None:
         topic = "Entire psychology of fear in 15 mins"
         story_parts = 1
         seo = {"title": "The Psychology of Fear Explained", "description": "...", "tags": ["psychology"], "hashtags": []}
+        script = clean_script_for_tts(script)
+        prompt_lines, segments = align_scenes_to_narration(script, prompt_lines, pipeline)
     else:
         seeds = load_json(args.config)
         urls = seeds.get("urls", [])
@@ -249,11 +260,14 @@ def main() -> None:
         )
 
         print("[Step 1–2] Topics...", flush=True)
-        topics_raw = ask(notebook_id, load_prompt("topics_finding.txt"), new=True)
+        history = load_topic_history()
+        past_topics = format_topic_history_for_prompt(history)
+        topics_prompt = load_prompt("topics_finding.txt").replace("{past_topics}", past_topics)
+        topics_raw = ask(notebook_id, topics_prompt, new=True)
         (out / "topics_list.txt").write_text(topics_raw, encoding="utf-8")
 
         print("[Step 2] Pick topic...", flush=True)
-        topic = pick_topic(notebook_id, topics_raw)
+        topic = pick_topic(notebook_id, topics_raw, past_topics)
         print(f"  -> {topic}", flush=True)
 
         print("[Step 3] Script (multi-part)...", flush=True)
@@ -267,12 +281,23 @@ def main() -> None:
         print(f"  -> {word_count} words (target ~{target_words})", flush=True)
 
         print("[Step 5] Image prompts (multi-part)...", flush=True)
-        image_prompt = load_prompt("story_to_image.txt").replace("{duration_minutes}", str(duration))
+        target_scene_count = estimate_scene_count(script, pipeline)
+        print(f"  -> target {target_scene_count} scenes from {word_count} words", flush=True)
+        script_excerpt = script[:12000]
+        image_prompt = (
+            load_prompt("story_to_image.txt")
+            .replace("{duration_minutes}", str(duration))
+            .replace("{target_scene_count}", str(target_scene_count))
+            .replace("{script_excerpt}", script_excerpt)
+        )
         prompt_lines = collect_all_image_prompts(notebook_id, image_prompt, continue_word, new=True)
-        if len(prompt_lines) < 10:
+        if len(prompt_lines) < max(5, target_scene_count // 3):
             print("  Warning: very few image prompts, retrying once...", flush=True)
             prompt_lines = collect_all_image_prompts(
-                notebook_id, image_prompt + "\n\nGenerate at least 40 distinct prompts.", continue_word, new=True
+                notebook_id,
+                image_prompt + f"\n\nGenerate at least {target_scene_count} distinct prompts aligned to the script.",
+                continue_word,
+                new=True,
             )
 
         if pipeline.get("dedupe_image_prompts", True):
@@ -296,8 +321,16 @@ def main() -> None:
         if len(prompt_lines) < before_cap:
             print(f"  Capped scenes {before_cap} -> {len(prompt_lines)} (max_scenes={max_scenes})", flush=True)
 
+        script = clean_script_for_tts(script)
+        prompt_lines, segments = align_scenes_to_narration(script, prompt_lines, pipeline)
+        print(f"  Aligned to {len(prompt_lines)} narrated scenes (dropped unused tail prompts)", flush=True)
+
         print("[Step 8] YouTube SEO (US)...", flush=True)
-        seo_prompt = load_prompt("youtube_seo.txt").replace("{topic}", topic)
+        seo_prompt = (
+            load_prompt("youtube_seo.txt")
+            .replace("{topic}", topic)
+            .replace("{past_topics}", past_topics)
+        )
         seo_raw = ask(notebook_id, seo_prompt, new=True)
         (out / "youtube_seo_raw.txt").write_text(seo_raw, encoding="utf-8")
         try:
@@ -313,11 +346,30 @@ def main() -> None:
                 print("  Using fallback SEO metadata", flush=True)
                 seo = fallback_seo(topic)
 
+        thumbnail_meta: dict | None = None
+        if pipeline.get("generate_thumbnail", True):
+            print("[Step 6] Thumbnail prompt...", flush=True)
+            thumb_prompt = (
+                load_prompt("thumbnail.txt")
+                .replace("{topic}", topic)
+                .replace("{title}", seo.get("title", topic))
+            )
+            thumb_raw = ask(notebook_id, thumb_prompt, new=True)
+            thumb_line = " ".join(thumb_raw.strip().splitlines()[0].split()).strip('"')
+            if len(thumb_line) > 30:
+                thumbnail_meta = {
+                    "prompt": thumb_line,
+                    "topic": topic,
+                    "title": seo.get("title", topic),
+                    "entity_refs": entity_refs,
+                }
+                print(f"  -> thumbnail prompt ({len(thumb_line.split())} words)", flush=True)
+
     scenes = prompts_to_scenes(prompt_lines, entity_refs)
     if not args.dry_run:
         (out / "script_raw.txt").write_text(script, encoding="utf-8")
-    script = clean_script_for_tts(script)
-    segments = [clean_script_for_tts(t) for t in split_script_for_scenes(script, len(scenes))]
+    if not segments:
+        segments = [clean_script_for_tts(t) for t in split_script_for_scenes(script, len(scenes))]
 
     (out / "script.txt").write_text(script, encoding="utf-8")
     (out / "topics.txt").write_text(topic, encoding="utf-8")
@@ -325,6 +377,17 @@ def main() -> None:
     save_json(out / "script_segments.json", [{"scene_id": i + 1, "text": t} for i, t in enumerate(segments)])
     save_json(out / "youtube_seo.json", seo)
     save_json(out / "entities.json", [])
+    if thumbnail_meta:
+        save_json(out / "thumbnail.json", thumbnail_meta)
+
+    history_path = CONFIG / "topic_history.json"
+    if not args.dry_run:
+        append_topic_history(
+            history_path,
+            run_id=run_id,
+            topic=topic,
+            title=str(seo.get("title", topic)),
+        )
 
     meta: dict = {
         "run_id": run_id,

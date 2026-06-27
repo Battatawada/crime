@@ -46,7 +46,7 @@ def ass_time(seconds: float) -> str:
     return f"{h}:{m:02d}:{s:02d}.{cs_rem:02d}"
 
 
-# Max words visible at once (sliding window around active word)
+# Max words visible at once — fixed blocks; highlight moves within the block (old karaoke feel)
 KARAOKE_WINDOW = 7
 
 
@@ -60,17 +60,16 @@ def _display_word(raw: str) -> str:
     return word
 
 
-def _window_bounds(length: int, active_idx: int, window: int = KARAOKE_WINDOW) -> tuple[int, int]:
-    half = window // 2
-    start = max(0, active_idx - half)
+def _chunk_bounds(length: int, active_idx: int, window: int = KARAOKE_WINDOW) -> tuple[int, int]:
+    """Fixed 7-word chunks; text stays put while yellow moves word-to-word."""
+    start = (active_idx // window) * window
     end = min(length, start + window)
-    start = max(0, end - window)
     return start, end
 
 
 def build_highlight_line(words: list[dict], active_idx: int) -> str:
-    """Show a short phrase around the active word — not the entire scene."""
-    start, end = _window_bounds(len(words), active_idx)
+    """Up to 7 words per block; active word yellow, others white (no rotating window)."""
+    start, end = _chunk_bounds(len(words), active_idx)
     parts: list[str] = []
     for j in range(start, end):
         token = _display_word(words[j].get("text", ""))
