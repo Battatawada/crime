@@ -31,7 +31,7 @@ WrapStyle: 0
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Karaoke,Arial,36,{white},&H000000FF,{black},&H80000000,1,0,0,0,100,100,0,0,1,3,0,2,120,120,140,1
+Style: Karaoke,Arial,42,{white},&H000000FF,{black},&H80000000,0,0,0,0,100,100,0,0,1,3,0,2,120,120,140,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -51,13 +51,36 @@ KARAOKE_WINDOW = 7
 
 
 def _display_word(raw: str) -> str:
-    """Keep punctuation; avoid ALL CAPS wall-of-text."""
+    """Keep punctuation from source text; avoid ALL CAPS wall-of-text."""
     word = raw.strip()
     if not word:
         return ""
-    # Strip stray markdown but keep . , ? ! ' "
-    word = re.sub(r"^[^\w'\"]+|[^\w'\"?!.,]+$", "", word)
+    word = re.sub(r"^[^\w'\"]+", "", word)
     return word
+
+
+def attach_punctuation_from_text(words: list[dict], text: str) -> list[dict]:
+    """edge-tts WordBoundary often drops punctuation — restore from script segment."""
+    if not words or not text.strip():
+        return words
+    src_tokens = re.findall(r"\S+", text.strip())
+    if len(src_tokens) == len(words):
+        return [{**w, "text": src_tokens[i]} for i, w in enumerate(words)]
+
+    out: list[dict] = []
+    src_i = 0
+    for w in words:
+        core = re.sub(r"[^\w']", "", w.get("text", "")).lower()
+        matched = w.get("text", "")
+        while src_i < len(src_tokens):
+            src = src_tokens[src_i]
+            src_core = re.sub(r"[^\w']", "", src).lower()
+            src_i += 1
+            if core == src_core or (core and core in src_core):
+                matched = src
+                break
+        out.append({**w, "text": matched})
+    return out
 
 
 def _chunk_bounds(length: int, active_idx: int, window: int = KARAOKE_WINDOW) -> tuple[int, int]:
@@ -76,7 +99,7 @@ def build_highlight_line(words: list[dict], active_idx: int) -> str:
         if not token:
             continue
         if j == active_idx:
-            parts.append(f"{{\\1c{YELLOW}\\b1}}{token}{{\\1c{WHITE}\\b0}}")
+            parts.append(f"{{\\1c{YELLOW}}}{token}{{\\1c{WHITE}}}")
         else:
             parts.append(token)
     if not parts:

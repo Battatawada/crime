@@ -10,7 +10,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from captions import estimate_word_timings, write_scene_karaoke_ass
+from captions import attach_punctuation_from_text, estimate_word_timings, write_scene_karaoke_ass
 from common import load_json
 
 FPS = 30
@@ -209,8 +209,11 @@ def main() -> None:
             sys.exit(f"Missing image {img}")
 
         words = timings_by_scene.get(scene_id, [])
+        segment_text = segments_by_scene.get(scene_id, "")
         if not words:
-            words = estimate_word_timings(segments_by_scene.get(scene_id, ""), dur)
+            words = estimate_word_timings(segment_text, dur)
+        elif segment_text.strip():
+            words = attach_punctuation_from_text(words, segment_text)
 
         ass_path = ass_dir / f"scene_{scene_id:02d}.ass"
         ass_written = write_scene_karaoke_ass(words, ass_path, duration=dur)

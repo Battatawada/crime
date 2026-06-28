@@ -21,7 +21,15 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import edge_tts
 
-from captions import EMILY, ANDREW, estimate_word_timings, merge_srt_blocks, pick_narrator_voice, resolve_voice
+from captions import (
+    EMILY,
+    ANDREW,
+    attach_punctuation_from_text,
+    estimate_word_timings,
+    merge_srt_blocks,
+    pick_narrator_voice,
+    resolve_voice,
+)
 from common import CONFIG, clean_script_for_tts, load_json, save_json, split_script_for_scenes
 
 DEFAULT_VOICES = [EMILY, ANDREW]
@@ -175,6 +183,8 @@ async def run_phase(
             dur = probe_duration(part)
             if text.strip() and not words:
                 words = estimate_word_timings(text, dur)
+            if text.strip() and words:
+                words = attach_punctuation_from_text(words, text)
             durations.append(
                 {
                     "scene_id": sid,
