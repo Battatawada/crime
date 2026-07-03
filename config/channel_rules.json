@@ -1,4 +1,5 @@
 {
+  "channel_name": "Mind in Minutes",
   "shorts": {
     "max_per_day": 3,
     "optimal_times": ["07:00", "12:00", "17:00"]
@@ -12,10 +13,11 @@
     "avoid_hours": [0, 1, 2, 3, 4, 5]
   },
   "seo": {
-    "niche": "motivation human psychology",
-    "default_tags": ["motivation", "psychology", "mindset", "self improvement"],
+    "niche": "mind psychology explained",
+    "default_tags": ["mind in minutes", "psychology", "human behavior", "motivation", "self improvement"],
     "title_max_chars": 65,
-    "region": "US"
+    "region": "US",
+    "description_footer": "About Mind in Minutes\nWhy we think, feel, and act the way we do — in about 15 minutes. Psychology and human behavior explainers with stick-figure storytelling.\n\nSubscribe for new videos every week.\nhttps://www.youtube.com/@mindinminutes01\n\n#psychology #humanbehavior #mindinminutes"
   },
   "upload": {
     "privacy": "private",

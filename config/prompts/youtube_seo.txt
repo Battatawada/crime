@@ -1,4 +1,4 @@
-Create YouTube SEO for a US motivation/psychology stick-figure channel.
+Create YouTube SEO for **Mind in Minutes** — a US psychology stick-figure channel (~15 min explainers).
 
 Topic: {topic}
 
@@ -7,10 +7,10 @@ Study the reference channel sources in this notebook — match how THEIR titles 
 Past videos (differentiate — do not copy these titles):
 {past_topics}
 
-Output ONLY valid JSON (no markdown):
+Output ONLY valid JSON (no markdown, no ** bold, no backticks):
 {
   "title": "max 65 chars — specific hook a human would click in Home/Search",
-  "description": "2-3 paragraphs: hook in first 150 chars, keywords natural, one timestamps line placeholder, subscribe CTA",
+  "description": "MINIMUM 600 characters. Structure: (1) hook paragraph answering why viewer should watch, (2) 3-5 bullet points of what they will learn, (3) line 'Timestamps coming soon', (4) short subscribe CTA. Plain text only.",
   "tags": ["tag1", ... max 15, US search intent],
   "hashtags": ["#tag1", ... max 5]
 }
@@ -20,4 +20,4 @@ Title rules:
 - Prefer: "The Psychology of…", "Why You…", "Entire … in 15 mins", specific behavior or emotion
 - No ALL CAPS, no emoji spam, no "You won't believe"
 
-Description: speak to the viewer's situation; mention what they'll learn by end.
+Description: speak to the viewer's situation; mention Mind in Minutes once naturally; include subscribe CTA.

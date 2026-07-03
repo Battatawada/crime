@@ -15,7 +15,7 @@ from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 
-from common import CONFIG, load_json
+from common import CONFIG, load_json, sanitize_seo_title
 
 
 def build_youtube():
@@ -31,6 +31,25 @@ def build_youtube():
 
 def tag_char_count(tags: list[str]) -> int:
     return sum(len(t) + (2 if " " in t else 0) for t in tags) + max(0, len(tags) - 1)
+
+
+def build_description(seo: dict, meta: dict, rules: dict) -> str:
+    body = (seo.get("description") or meta.get("topic") or "").strip()
+    footer = (rules.get("seo") or {}).get("description_footer", "").strip()
+    if footer and footer not in body:
+        body = f"{body}\n\n{footer}" if body else footer
+    return body
+
+
+def merge_tags(seo: dict, rules: dict) -> list[str]:
+    seen: set[str] = set()
+    merged: list[str] = []
+    for tag in (seo.get("tags") or []) + (rules.get("seo") or {}).get("default_tags", []):
+        key = str(tag).strip().lower()
+        if key and key not in seen:
+            seen.add(key)
+            merged.append(str(tag).strip())
+    return merged
 
 
 def main() -> None:
@@ -54,9 +73,13 @@ def main() -> None:
     seo = load_json(args.seo) if args.seo.exists() else {}
     meta = load_json(args.metadata) if args.metadata.exists() else {}
 
-    title = (seo.get("title") or meta.get("title") or meta.get("topic") or "Motivation Story")[:100]
-    description = seo.get("description") or meta.get("topic") or ""
-    tags = seo.get("tags") or rules.get("seo", {}).get("default_tags", [])
+    title_max = int((rules.get("seo") or {}).get("title_max_chars", 65))
+    title = sanitize_seo_title(
+        seo.get("title") or meta.get("title") or meta.get("topic") or "Motivation Story",
+        max_chars=title_max,
+    )
+    description = build_description(seo, meta, rules)
+    tags = merge_tags(seo, rules)
     if tag_char_count(tags) > 500:
         tags = tags[:10]
 

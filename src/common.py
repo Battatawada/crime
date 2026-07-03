@@ -573,12 +573,31 @@ def parse_seo_json(text: str) -> dict:
     raise ValueError("No SEO JSON object in NotebookLM response")
 
 
+def sanitize_seo_title(title: str, max_chars: int = 65) -> str:
+    cleaned = re.sub(r"\*+", "", title or "").strip(" -–—")
+    return cleaned[:max_chars].strip()
+
+
 def fallback_seo(topic: str) -> dict:
-    """Minimal SEO metadata when NotebookLM returns non-JSON."""
-    title = topic[:65].strip()
+    """Rich SEO metadata when NotebookLM returns non-JSON."""
+    niche = load_json(CONFIG / "niche.json") if (CONFIG / "niche.json").exists() else {}
+    channel = niche.get("name", "Mind in Minutes")
+    tagline = niche.get("tagline", "Psychology explainers in about 15 minutes.")
+    title = sanitize_seo_title(topic)
+    description = (
+        f"{tagline}\n\n"
+        f"In this video we break down {topic.lower()} with stick-figure stories and real psychology — "
+        f"no jargon, no fluff.\n\n"
+        f"What you'll learn:\n"
+        f"• Why this pattern shows up in everyday life\n"
+        f"• The hidden mental mechanism behind it\n"
+        f"• Practical takeaways you can use today\n\n"
+        f"Timestamps coming soon.\n\n"
+        f"If this helped, subscribe to {channel} for more psychology explainers."
+    )
     return {
         "title": title,
-        "description": f"{topic}\n\nMotivation and human psychology for a US audience.",
-        "tags": ["motivation", "psychology", "mindset", "self improvement"],
-        "hashtags": ["#motivation", "#psychology"],
+        "description": description,
+        "tags": ["mind in minutes", "psychology", "human behavior", "motivation", "self improvement"],
+        "hashtags": ["#psychology", "#mindinminutes"],
     }

@@ -1,4 +1,5 @@
 .env
+client_secret*.json
 auth.json
 context.md
 output/
