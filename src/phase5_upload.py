@@ -18,9 +18,6 @@ from googleapiclient.http import MediaFileUpload
 
 from common import CONFIG, load_json, sanitize_seo_title
 
-# Unverified YouTube channels cannot publish videos longer than 15 minutes.
-DEFAULT_MAX_UPLOAD_SEC = 15 * 60
-
 # Must match scopes granted in scripts/youtube_oauth_refresh.py
 YOUTUBE_SCOPES = [
     "https://www.googleapis.com/auth/youtube.upload",
@@ -147,28 +144,8 @@ def main() -> None:
     if tag_char_count(tags) > 500:
         tags = tags[:10]
 
-    max_upload_sec = float(
-        os.environ.get(
-            "YOUTUBE_MAX_DURATION_SEC",
-            str(upload_rules.get("max_duration_sec", DEFAULT_MAX_UPLOAD_SEC)),
-        )
-    )
     duration_sec = probe_video_duration_sec(args.video)
-    print(
-        json.dumps(
-            {
-                "video_duration_sec": round(duration_sec, 1),
-                "max_upload_sec": max_upload_sec,
-            }
-        )
-    )
-    if duration_sec > max_upload_sec:
-        sys.exit(
-            f"Video is {duration_sec / 60:.1f} min — exceeds YouTube limit of "
-            f"{max_upload_sec / 60:.0f} min limit. "
-            "Shorten the script in phase 1 or raise upload.max_duration_sec. "
-            "Artifact final_video.mp4 is still saved for manual upload."
-        )
+    print(json.dumps({"video_duration_sec": round(duration_sec, 1), "video_duration_min": round(duration_sec / 60, 1)}))
 
     youtube = build_youtube()
     body = {

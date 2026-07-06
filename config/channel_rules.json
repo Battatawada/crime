@@ -27,7 +27,6 @@
     "embeddable": true,
     "license": "youtube",
     "public_stats_viewable": true,
-    "contains_synthetic_media": false,
-    "max_duration_sec": 1200
+    "contains_synthetic_media": false
   }
 }
