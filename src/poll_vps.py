@@ -7,11 +7,15 @@ import argparse
 import os
 import sys
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from common import httpx_get_json_with_retry
+
+# No scene PNGs yet during these phases — don't treat as a stuck image run.
+SETUP_PHASES = frozenset({"queued", "project", "refs", "thumbnail"})
 
 
 def main() -> None:
@@ -49,6 +53,10 @@ def main() -> None:
         phase = data.get("phase", "")
         print(f"status={status} phase={phase} images={ready}/{total}", flush=True)
 
+        err = data.get("error")
+        if err:
+            print(f"  worker_error={err}", flush=True)
+
         if status == "complete":
             return
 
@@ -74,14 +82,34 @@ def main() -> None:
                 )
             sys.exit(f"VPS job failed: {err}")
 
+        updated_at = data.get("updated_at")
+        recently_active = False
+        if updated_at:
+            try:
+                ts = datetime.fromisoformat(str(updated_at).replace("Z", "+00:00"))
+                recently_active = (datetime.now(timezone.utc) - ts).total_seconds() < 180
+            except ValueError:
+                recently_active = False
+
         if status == "running" and ready > 0:
+            stale_since = None
+        elif phase in SETUP_PHASES:
+            stale_since = None
+        elif recently_active:
             stale_since = None
         elif status in {"running", "pending"} and ready == 0:
             if stale_since is None:
                 stale_since = time.time()
             elif time.time() - stale_since > 900:
+                hint = ""
+                if err and ("502" in str(err) or "401" in str(err)):
+                    hint = (
+                        " Flow auth likely expired — VNC re-login at "
+                        "labs.google/fx/tools/flow, then vps-preflight.sh and resume."
+                    )
                 sys.exit(
-                    "VPS job stuck at 0 images for 15+ minutes — check FlowKit/Chrome on VPS"
+                    "VPS job stuck at 0 images for 15+ minutes — "
+                    f"check FlowKit/Chrome on VPS.{hint}"
                 )
 
         time.sleep(args.interval)
