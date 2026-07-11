@@ -14,7 +14,7 @@ from captions import attach_punctuation_from_text, estimate_word_timings, write_
 from common import load_json
 
 FPS = 30
-BG_COLOR = "0xF5F0E8"
+BG_COLOR = "0x000000"
 MAX_ZOOM = 1.0  # 1.0 = no Ken Burns zoom
 
 
@@ -178,7 +178,15 @@ def main() -> None:
     pipeline_path = Path(__file__).resolve().parents[1] / "config" / "pipeline.json"
     pipeline = load_json(pipeline_path) if pipeline_path.exists() else {}
     max_zoom = args.max_zoom if args.max_zoom is not None else float(pipeline.get("max_zoom", MAX_ZOOM))
+    global BG_COLOR
+    BG_COLOR = str(pipeline.get("letterbox_color", BG_COLOR))
     fonts_dir = _find_fonts_dir()
+
+    archival_map: dict[str, str] = {}
+    archival_plan = out / "archival_plan.json"
+    if archival_plan.exists():
+        plan = load_json(archival_plan)
+        archival_map = {str(k): str(v) for k, v in (plan.get("scene_map") or {}).items()}
 
     for old in work.glob("*.mp4"):
         old.unlink()
@@ -205,6 +213,12 @@ def main() -> None:
         scene_id = int(item["scene_id"])
         dur = float(item["duration_sec"])
         img = img_dir / item.get("file", f"scene_{scene_id:02d}.png")
+        # Light sprinkle: real Wikipedia stills override Flow frames when mapped
+        arch_name = archival_map.get(str(scene_id))
+        if arch_name:
+            arch_path = out / "archival" / arch_name
+            if arch_path.exists() and arch_path.stat().st_size > 8_000:
+                img = arch_path
         if not img.exists():
             sys.exit(f"Missing image {img}")
 

@@ -1,7 +1,4 @@
 {
-  "urls": [
-    "https://youtu.be/5lVfIV3JlXw?si=Kp20AMLf8zvK3_tH",
-    "https://youtu.be/X8yX1tU_iP8?si=xRk-s2YptHUd41uM",
-    "https://youtu.be/Bm56LgM2rVw?si=zrF2jKfVVQ_xYvP5"
-  ]
+  "urls": [],
+  "note": "True crime uses NotebookLM web research per topic. Seed YouTube URLs are optional style refs only."
 }

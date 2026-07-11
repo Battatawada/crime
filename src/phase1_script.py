@@ -39,6 +39,7 @@ from common import (
     load_prompt,
     load_topic_history,
     new_run_id,
+    next_series_type,
     notebooklm_json,
     notebooklm_json_with_retry,
     parse_image_prompt_lines,
@@ -189,10 +190,13 @@ def _first_topic_from_list(topics_raw: str) -> str:
     raise RuntimeError("Could not parse any topic from topics_list")
 
 
-def pick_topic(notebook_id: str, topics_raw: str, past_topics: str) -> str:
+def pick_topic(notebook_id: str, topics_raw: str, past_topics: str, series_type: str) -> str:
     """Pick topic in the same NotebookLM chat as topics list (no --new)."""
     prompt = (
-        f"{load_prompt('pick_topic.txt').replace('{past_topics}', past_topics)}\n\nTopics:\n{topics_raw}"
+        load_prompt("pick_topic.txt")
+        .replace("{past_topics}", past_topics)
+        .replace("{series_type}", series_type)
+        + f"\n\nTopics:\n{topics_raw}"
     )
     try:
         raw = ask(notebook_id, prompt, new=False)
@@ -206,6 +210,56 @@ def pick_topic(notebook_id: str, topics_raw: str, past_topics: str) -> str:
     except Exception as exc:
         print(f"  Warning: topic pick failed ({exc}), using first listed topic", flush=True)
         return _first_topic_from_list(topics_raw)
+
+
+def add_web_research(notebook_id: str, topic: str, pipeline: dict) -> list[str]:
+    """Deep web research for the chosen topic; return imported source ids when available."""
+    import subprocess
+
+    mode = str(pipeline.get("research_mode", "deep"))
+    timeout = str(int(pipeline.get("research_timeout", 1800)))
+    print(f"  Web research ({mode}) for: {topic}", flush=True)
+    cmd = [
+        "notebooklm",
+        "source",
+        "add-research",
+        topic,
+        "--notebook",
+        notebook_id,
+        "--from",
+        "web",
+        "--mode",
+        mode,
+        "--import-all",
+        "--cited-only",
+        "--timeout",
+        timeout,
+        "--json",
+    ]
+    result = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8")
+    if result.returncode != 0:
+        err = (result.stderr or result.stdout or "add-research failed").strip()
+        raise RuntimeError(err)
+    source_ids: list[str] = []
+    raw = (result.stdout or "").strip()
+    if raw.startswith("{") or raw.startswith("["):
+        try:
+            data = json.loads(raw)
+            if isinstance(data, dict):
+                for key in ("sources", "imported", "items"):
+                    items = data.get(key)
+                    if isinstance(items, list):
+                        for item in items:
+                            if isinstance(item, dict) and (item.get("id") or item.get("source_id")):
+                                source_ids.append(str(item.get("id") or item.get("source_id")))
+                if data.get("id"):
+                    source_ids.append(str(data["id"]))
+                src = data.get("source")
+                if isinstance(src, dict) and src.get("id"):
+                    source_ids.append(str(src["id"]))
+        except json.JSONDecodeError:
+            pass
+    return list(dict.fromkeys(source_ids))
 
 
 def collect_multipart_text(
@@ -401,45 +455,55 @@ def main() -> None:
     run_id = new_run_id()
     pipeline = load_json(args.pipeline) if args.pipeline.exists() else {}
     niche = load_json(CONFIG / "niche.json") if (CONFIG / "niche.json").exists() else {}
-    duration = int(pipeline.get("duration_minutes", 15))
+    duration = int(pipeline.get("duration_minutes", 25))
     wpm = int(pipeline.get("words_per_minute", 140))
-    entity_refs = pipeline.get("default_entity_refs", ["character_A"])
+    entity_refs = pipeline.get(
+        "default_entity_refs",
+        ["style_host", "style_host_react", "style_fact_card", "style_case_scene"],
+    )
     continue_word = pipeline.get("continue_keyword", "Next")
     target_words = duration * wpm
     notebook_id = ""
     segments: list[str] = []
     thumbnail_meta: dict | None = None
+    series_type = next_series_type()
 
     if args.dry_run:
         script = (
-            "The rain had not stopped for three days. "
-            "Nobody in the town spoke about what was buried beneath the old market."
+            "On a quiet Friday afternoon, two toddlers walked away from a shopping center. "
+            "What happened next became one of the most disturbing cases in modern history."
         )
         prompt_lines = [
-            "Minimal cinematic chibi, lone figure at rain-streaked window, amber streetlight, muted blues.",
-            "Minimal cinematic chibi, figure approaching basement door, flickering bulb, tense posture.",
+            "Matte black void, Jonty host charcoal shirt red JONTY text pointing coldly, bold 2D outline.",
+            "Desaturated archival photo style shopping center exterior, faces blurred, documentary grain, no gore.",
         ]
-        topic = "Entire psychology of fear in 15 mins"
+        topic = "The James Bulger murder — the full story"
         story_parts = 1
-        seo = {"title": "The Psychology of Fear Explained", "description": "...", "tags": ["psychology"], "hashtags": []}
+        seo = {
+            "title": "The James Bulger Case: The Full Story",
+            "description": "...",
+            "tags": ["true crime"],
+            "hashtags": [],
+        }
         script = clean_script_for_tts(script)
         prompt_lines, segments = align_scenes_to_narration(script, prompt_lines, pipeline)
     else:
-        seeds = load_json(args.config)
-        urls = seeds.get("urls", [])
-        if not urls or "REPLACE" in str(urls[0]):
-            sys.exit("Edit config/seed_urls.json with niche reference YouTube URLs")
+        seeds = load_json(args.config) if args.config.exists() else {"urls": []}
+        urls = [u for u in seeds.get("urls", []) if u and "REPLACE" not in str(u)]
 
-        created = notebooklm_json_with_retry("create", f"{niche.get('name', 'Video')} {run_id}", "--use")
+        created = notebooklm_json_with_retry(
+            "create", f"{niche.get('name', 'True Crime')} {run_id}", "--use"
+        )
         notebook_id = extract_notebook_id(created)
 
         source_ids: list[str] = []
         source_request_timeout = int(pipeline.get("source_request_timeout", 120))
         source_add_delay = float(pipeline.get("source_add_delay_sec", 5))
+
         for i, url in enumerate(urls):
             if i:
                 time.sleep(source_add_delay)
-            print(f"  Adding source {i + 1}/{len(urls)}...", flush=True)
+            print(f"  Adding optional seed source {i + 1}/{len(urls)}...", flush=True)
             added = notebooklm_json_with_retry(
                 "source",
                 "add",
@@ -450,23 +514,39 @@ def main() -> None:
                 str(source_request_timeout),
             )
             source_ids.append(extract_source_id(added))
-        time.sleep(source_add_delay)
-        wait_sources(
-            notebook_id,
-            source_ids,
-            timeout=int(pipeline.get("source_wait_timeout", 300)),
-        )
+        if source_ids:
+            time.sleep(source_add_delay)
+            wait_sources(
+                notebook_id,
+                source_ids,
+                timeout=int(pipeline.get("source_wait_timeout", 300)),
+            )
 
-        print("[Step 1–2] Topics...", flush=True)
+        print(f"[Step 1–2] Topics ({series_type})...", flush=True)
         history = load_topic_history()
         past_topics = format_topic_history_for_prompt(history)
-        topics_prompt = load_prompt("topics_finding.txt").replace("{past_topics}", past_topics)
+        topics_prompt = (
+            load_prompt("topics_finding.txt")
+            .replace("{past_topics}", past_topics)
+            .replace("{series_type}", series_type)
+        )
         topics_raw = ask(notebook_id, topics_prompt, new=True)
         (out / "topics_list.txt").write_text(topics_raw, encoding="utf-8")
 
         print("[Step 2] Pick topic...", flush=True)
-        topic = pick_topic(notebook_id, topics_raw, past_topics)
+        topic = pick_topic(notebook_id, topics_raw, past_topics, series_type)
         print(f"  -> {topic}", flush=True)
+
+        print("[Step 2b] Web research for topic...", flush=True)
+        research_ids = add_web_research(notebook_id, topic, pipeline)
+        if research_ids:
+            wait_sources(
+                notebook_id,
+                research_ids,
+                timeout=int(pipeline.get("source_wait_timeout", 600)),
+            )
+        else:
+            time.sleep(15)
 
         print("[Step 3] Script (multi-part)...", flush=True)
         story_prompt = (
@@ -504,7 +584,7 @@ def main() -> None:
         if len(prompt_lines) < 5:
             sys.exit(f"Too few image prompts after filtering ({len(prompt_lines)}). Re-run pipeline.")
 
-        max_scenes = int(pipeline.get("max_scenes", 60))
+        max_scenes = int(pipeline.get("max_scenes", 80))
         before_cap = len(prompt_lines)
         prompt_lines = cap_scenes(prompt_lines, max_scenes)
         if len(prompt_lines) < before_cap:
@@ -535,7 +615,7 @@ def main() -> None:
                 print("  Using fallback SEO metadata", flush=True)
                 seo = fallback_seo(topic)
 
-        thumbnail_meta: dict | None = None
+        thumbnail_meta = None
         if pipeline.get("generate_thumbnail", True):
             print("[Step 6] Thumbnail prompt...", flush=True)
             thumb_prompt = (
@@ -553,6 +633,22 @@ def main() -> None:
                     "entity_refs": entity_refs,
                 }
                 print(f"  -> thumbnail prompt ({len(thumb_line.split())} words)", flush=True)
+
+        try:
+            from archival_images import (
+                assign_archival_to_scenes,
+                fetch_archival_images,
+                write_archival_plan,
+            )
+
+            arch_count = int(pipeline.get("archival_photo_count", 4))
+            every_n = int(pipeline.get("archival_every_n_scenes", 8))
+            archival = fetch_archival_images(topic, out / "archival", count=arch_count)
+            scene_map = assign_archival_to_scenes(len(prompt_lines), archival, every_n=every_n)
+            write_archival_plan(out, archival, scene_map)
+            print(f"  Archival photos: {len(archival)} files, {len(scene_map)} scene slots", flush=True)
+        except Exception as exc:
+            print(f"  Archival fetch skipped: {exc}", flush=True)
 
     scenes = prompts_to_scenes(prompt_lines, entity_refs)
     if not args.dry_run:
@@ -576,12 +672,15 @@ def main() -> None:
             run_id=run_id,
             topic=topic,
             title=str(seo.get("title", topic)),
+            series_type=series_type,
         )
 
     meta: dict = {
         "run_id": run_id,
         "notebook_id": notebook_id,
         "niche": niche.get("name"),
+        "host": niche.get("host_name", "Jonty"),
+        "series_type": series_type,
         "topic": topic,
         "duration_minutes": duration,
         "word_count": len(script.split()),
@@ -595,6 +694,7 @@ def main() -> None:
     save_json(out / "metadata.json", meta)
 
     print(f"run_id={run_id}")
+    print(f"series_type={series_type}")
     print(f"Done: script + {len(scenes)} scenes + SEO -> {out}")
 
 

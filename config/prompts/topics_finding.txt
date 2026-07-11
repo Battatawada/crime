@@ -1,13 +1,18 @@
-Study the YouTube reference sources in this notebook (their titles, hooks, pacing, and "Entire X in Y mins" format).
+Channel: Criminally Drawn. Host: Jonty (cold documentary narrator). Real true-crime stories in minimal 2D animation.
 
 Past videos we ALREADY published (do NOT repeat or closely rephrase):
 {past_topics}
 
-Generate 10 NEW video topics for a US motivation/psychology stick-figure channel in the same niche.
+This upload's series type: {series_type}
+- If series_type is "incident": propose ONE real-life crime/incident cases (single event or investigation), fully tellable in ~25 minutes. Prefer famous US cases while building the library; worldwide OK.
+- If series_type is "serial_killer": propose ONE serial killer life stories (focus famous US names first; worldwide OK).
+
+Generate 10 NEW topic lines for that series type only.
 
 Rules:
-- Format like reference channels: "Entire [concept] in [15] mins" or "The Psychology of [X] Explained"
-- Each topic must feel human-clickable — curiosity, identity, or relatable struggle (not academic textbook titles)
-- Vary the angle from past videos: different mechanism, audience pain, or metaphor
-- US English, broad appeal, no clickbait spam ("You won't believe", all-caps shock)
+- Factual, specific, searchable (name the case or killer)
+- Must be coverable from public sources (Wikipedia-level + reputable reporting)
+- Strong curiosity without gore bait ("caught", "confession", "mistake", "timeline", "who", "how")
+- US English; adult audience; no "you won't believe" spam
+- Do NOT invent fictional crimes
 - One topic per line, numbered 1–10 only

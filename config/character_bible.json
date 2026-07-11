@@ -1,0 +1,53 @@
+{
+  "channel": {
+    "name": "Criminally Drawn",
+    "handle": "criminallydrawn",
+    "tagline": "Real cases. Drawn cold."
+  },
+  "host": {
+    "name": "Jonty",
+    "role": "Sole narrator / channel host for Criminally Drawn. Appears in host beats only — not every frame.",
+    "tone": "Cold documentary. Calm, precise, no jokes, no 'trust me bro' slang.",
+    "design": {
+      "summary": "Original minimal 2D host inspired by TrustMeBroCompilations energy — NOT a copy. Distinct silhouette and palette.",
+      "head": "Large perfect white circle, thick black outline, optional faint outer rim for pop on black backgrounds",
+      "face": "Two small black dot eyes, short straight serious mouth (neutral/cold). Occasional single raised line brow for tension — never goofy shock-mouth as default",
+      "hair_hat": "No red baseball cap. Short dark messy hair OR plain black beanie — never TMB red cap",
+      "body": "Simple charcoal/near-black rectangular torso, thin black stick limbs, bold outlines",
+      "identity_mark": "Red sans-serif text 'JONTY' across the chest of the shirt (always readable when torso is visible)",
+      "accent_color": "Blood-red (#E10600) only for JONTY lettering and rare UI accents — not a full red outfit",
+      "poses": "Pointing at evidence, standing in void, slight lean toward a photo, hands clasped — restrained, not cartoon slapstick"
+    },
+    "do_not": [
+      "Copy Trust Me Bro red-cap red-shirt host exactly",
+      "Make Jonty the crime perpetrator",
+      "Put jokes, winks, or meme faces on Jonty by default"
+    ]
+  },
+  "case_characters": {
+    "rule": "Per video only. Rebuild for each incident / killer. Never a fixed second mascot.",
+    "style": "Same 2D bold-outline language as Jonty, but unique face/body/clothes matching the real person at a stylized level. May use mixed-media (photo object in cartoon hand) for dread — never gore.",
+    "labels": "Optional name tag above head in white-on-black box, ALL CAPS"
+  },
+  "visual_language": {
+    "palette": "Matte black backgrounds, white/gray figures, caution red for dates/facts/height marks",
+    "layouts": [
+      "Host on black void",
+      "Host over desaturated real/photo background (small share of scenes)",
+      "Fact card: subject character + red date/height/stat callouts on black",
+      "Mystery collage: B&W face with scribble + white question mark (hooks/thumbnails)",
+      "Archival photo beat: real or documentary still, slight blur/desat, no gore"
+    ],
+    "safety": [
+      "No gore, no corpses, no blood pools, no sexual violence imagery",
+      "No real identifiable child-victim faces — blur, silhouette, or omit",
+      "Blur faces when needed for YouTube; use clinical language in narration",
+      "Profanity / graphic terms in script as [BEEP] — never spelled out for TTS"
+    ]
+  },
+  "series": {
+    "incident": "One real-life horrifying case / crime incident, fully told in one video",
+    "serial_killer": "Life and crimes of one serial killer (start with famous US cases; worldwide allowed)",
+    "rotation": "Alternate each upload: incident → serial_killer → incident → ..."
+  }
+}

@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Phase 2 — edge-tts (step 4 + timing for step 7)
+Phase 2 — edge-tts
 
-  4. Dual narrators — Emily primary, Andrew every 4th scene
-  7. Per-scene audio + word_timings.json for karaoke captions + captions.srt
+  Cold documentary narrator (default: en-US-ChristopherNeural).
+  Per-scene audio + word_timings.json for karaoke captions + captions.srt
 """
 
 from __future__ import annotations
@@ -22,8 +22,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import edge_tts
 
 from captions import (
-    EMILY,
-    ANDREW,
+    CHRISTOPHER,
     attach_punctuation_from_text,
     estimate_word_timings,
     merge_srt_blocks,
@@ -32,7 +31,7 @@ from captions import (
 )
 from common import CONFIG, clean_script_for_tts, load_json, save_json, split_script_for_scenes
 
-DEFAULT_VOICES = [EMILY, ANDREW]
+DEFAULT_VOICES = [CHRISTOPHER]
 MAX_TTS_RETRIES = 4
 EMPTY_SCENE_SEC = 0.35
 
@@ -218,8 +217,8 @@ async def run_phase(
     if end_cfg.get("enabled", True):
         end_script = end_cfg.get(
             "script",
-            "If you enjoyed this video, please consider subscribing. "
-            "It really helps us create more psychology stories for you. Thank you for watching.",
+            "If you want the next real case drawn the same way, subscribe to Criminally Drawn. "
+            "I'm Jonty. Thank you for watching.",
         )
         end_voice = resolve_voice(end_cfg.get("voice", voices[0]))
         end_path = output_dir / "end_card.mp3"

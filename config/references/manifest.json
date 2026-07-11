@@ -1,22 +1,22 @@
 {
-  "character_A": {
-    "file": "character_A.png",
-    "type": "character",
-    "description": "Primary channel mascot — minimalist black stick figure, circular head, dot eyes, simple line limbs, cream/beige background, hand-drawn doodle style"
-  },
-  "character_pose_walk": {
-    "file": "character_pose_walk.png",
-    "type": "character",
-    "description": "Same stick figure character walking, smiling, with simple props — same line-art style as character_A"
-  },
-  "character_pose_sleep": {
-    "file": "character_pose_sleep.png",
-    "type": "character",
-    "description": "Same stick figure sleeping in bed — identical head/face style, minimalist line art"
-  },
-  "style_infographic": {
-    "file": "style_infographic.png",
+  "style_host": {
+    "file": "2.png",
     "type": "style",
-    "description": "Clean flat infographic style for diagrams — teal/navy palette, simple labels, educational layout on beige background"
+    "description": "STYLE ONLY — host energy: minimal 2D circle-head narrator over photo/mystery collage. Our host is JONTY (charcoal shirt with red JONTY text, NO red baseball cap, cold face). Use pose/composition energy, not this exact character."
+  },
+  "style_host_react": {
+    "file": "3.png",
+    "type": "style",
+    "description": "STYLE ONLY — host on matte black void, bold outline, restrained reaction. Rebuild as Jonty (black/charcoal shirt, red JONTY chest text, no red cap)."
+  },
+  "style_fact_card": {
+    "file": "1.png",
+    "type": "style",
+    "description": "STYLE ONLY — black void fact layout: stylized subject, name tag, red date and red height/stat callouts. Recreate per case; do not copy this exact person."
+  },
+  "style_case_scene": {
+    "file": "4.png",
+    "type": "style",
+    "description": "STYLE ONLY — per-case character on dim real-photo environment, bold 2D outlines, mixed media allowed (photo prop). No gore. New design each case."
   }
 }

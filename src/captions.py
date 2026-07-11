@@ -8,10 +8,13 @@ from pathlib import Path
 # ASS colours are &HBBGGRR
 WHITE = "&HFFFFFF&"
 YELLOW = "&H00D7FF&"
+RED = "&H0000FF&"
 BLACK = "&H000000&"
+HIGHLIGHT = RED  # true-crime karaoke active word
 
 EMILY = "en-IE-EmilyNeural"
 ANDREW = "en-US-AndrewMultilingualNeural"
+CHRISTOPHER = "en-US-ChristopherNeural"
 
 # Common misconfiguration — en-US-EmilyNeural is not a valid edge-tts voice.
 VOICE_ALIASES: dict[str, str] = {
@@ -84,14 +87,14 @@ def attach_punctuation_from_text(words: list[dict], text: str) -> list[dict]:
 
 
 def _chunk_bounds(length: int, active_idx: int, window: int = KARAOKE_WINDOW) -> tuple[int, int]:
-    """Fixed 7-word chunks; text stays put while yellow moves word-to-word."""
+    """Fixed 7-word chunks; text stays put while highlight moves word-to-word."""
     start = (active_idx // window) * window
     end = min(length, start + window)
     return start, end
 
 
 def build_highlight_line(words: list[dict], active_idx: int) -> str:
-    """Up to 7 words per block; active word yellow, others white (no rotating window)."""
+    """Up to 7 words per block; active word highlighted, others white (no rotating window)."""
     start, end = _chunk_bounds(len(words), active_idx)
     parts: list[str] = []
     for j in range(start, end):
@@ -99,7 +102,7 @@ def build_highlight_line(words: list[dict], active_idx: int) -> str:
         if not token:
             continue
         if j == active_idx:
-            parts.append(f"{{\\1c{YELLOW}}}{token}{{\\1c{WHITE}}}")
+            parts.append(f"{{\\1c{HIGHLIGHT}}}{token}{{\\1c{WHITE}}}")
         else:
             parts.append(token)
     if not parts:
@@ -128,7 +131,7 @@ def estimate_word_timings(text: str, duration: float) -> list[dict]:
 
 
 def write_scene_karaoke_ass(words: list[dict], dest: Path, *, duration: float) -> Path | None:
-    """ASS with one event per word — active word yellow, rest white, black outline."""
+    """ASS with one event per word — active word highlighted (red), rest white, black outline."""
     cleaned = [w for w in words if _display_word(w.get("text", ""))]
     if not cleaned:
         return None
@@ -196,16 +199,14 @@ def merge_srt_blocks(blocks: list[str], offsets: list[float]) -> str:
 
 def pick_narrator_voice(scene_index: int, voices: list[str], segment_text: str) -> str:
     """
-    Emily leads (~75%); Andrew on every 4th scene (0-based: scenes 3, 7, 11…).
-    Scene 0 always Emily when she is configured as primary.
+    Primary voice for all scenes when only one is configured (true-crime default).
+    If two+ voices: primary most scenes; secondary every 4th (legacy psychology mix).
     """
-    emily = EMILY
-    andrew = ANDREW
-    for v in voices:
-        if "Emily" in v:
-            emily = v
-        if "Andrew" in v:
-            andrew = v
+    if not voices:
+        return CHRISTOPHER
+    if len(voices) == 1:
+        return voices[0]
+    primary, secondary = voices[0], voices[1]
     if scene_index % 4 == 3:
-        return andrew
-    return emily
+        return secondary
+    return primary

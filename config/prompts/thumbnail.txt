@@ -1,13 +1,13 @@
-Create ONE YouTube thumbnail image prompt for this video.
+Create ONE YouTube thumbnail image prompt for this true-crime video.
 
 Topic: {topic}
-Video title (for mood, do NOT render as readable text): {title}
+Video title (for mood, do NOT render as readable paragraph text): {title}
 
-Study the reference channel sources in this notebook — match their thumbnail energy:
-- One bold stick-figure moment (close-up or strong pose)
-- Cream/beige background, high contrast, clean minimalist line art
-- Single clear visual metaphor for the topic (brain, phone, bed, gym, etc.)
-- Leave empty space at top third for title overlay (no letters, no words in the image)
-- Emotionally punchy, human curiosity — not generic stock art
+Style:
+- High-contrast curiosity thumbnail in TrustMeBro-inspired energy but ORIGINAL
+- Prefer: mystery collage (desaturated face with scribble + large white "?") OR Jonty (charcoal shirt, red JONTY text, no red cap) pointing at a blurred evidence photo
+- Matte black or dark documentary background
+- Leave empty space in top third for title overlay (no long words in the image; short ALL-CAPS name tag OK)
+- Punchy, morbid curiosity — NOT gore, NOT corpses, NOT blood
 
 Output ONLY the image prompt as one standalone line (~45 words). No numbering, no quotes, no explanation.

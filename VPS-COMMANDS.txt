@@ -1,0 +1,231 @@
+================================================================================
+Niche / Mind In Minutes — VPS & pipeline command cheat sheet
+================================================================================
+Host:     140.245.245.123
+User:     ubuntu
+Key:      ssh-key-2026-06-24.key  (repo root on Windows)
+App:      /opt/niche
+Worker:   http://140.245.245.123:8765
+FlowKit:  http://127.0.0.1:8100  (localhost on VPS only)
+Runs:     /opt/niche/runs/{run_id}/
+Service:  niche-image-worker
+
+Replace RUN_ID with your run id, e.g. 20260707-192020
+Run all Windows commands from: C:\Users\Pracheer\Music\Niche
+================================================================================
+
+
+--------------------------------------------------------------------------------
+1. SSH
+--------------------------------------------------------------------------------
+
+# Plain SSH (Windows PowerShell)
+ssh -i "ssh-key-2026-06-24.key" ubuntu@140.245.245.123
+
+# SSH + VNC tunnel (keep this window open)
+ssh -i "ssh-key-2026-06-24.key" -L 5901:127.0.0.1:5901 ubuntu@140.245.245.123
+
+# Then in VNC client: connect to localhost:5901
+# In desktop Chrome: https://labs.google/fx/tools/flow  → sign in
+# If Chrome not running on VPS desktop:
+start-chrome-flowkit
+
+
+--------------------------------------------------------------------------------
+2. PREFLIGHT (do this before every image run / after Flow login)
+--------------------------------------------------------------------------------
+
+# On VPS
+bash /opt/niche/scripts/vps-preflight.sh
+
+# Must pass: create-project HTTP 200 AND generate-image HTTP 200
+# 502 / 401 = Flow login expired → VNC re-login, then re-run preflight
+# 403 = rate limit / unusual activity → wait or switch VPN (see section 5)
+
+
+--------------------------------------------------------------------------------
+3. RUN STATUS
+--------------------------------------------------------------------------------
+
+# On VPS
+bash /opt/niche/scripts/vps-run-status.sh RUN_ID
+
+# Count PNGs on disk
+ls /opt/niche/runs/RUN_ID/images/*.png | wc -l
+ls /opt/niche/runs/RUN_ID/images/
+
+# Worker logs
+sudo journalctl -u niche-image-worker -n 50 --no-pager
+sudo journalctl -u niche-image-worker -f
+
+# Worker service
+sudo systemctl status niche-image-worker
+sudo systemctl restart niche-image-worker
+sudo systemctl daemon-reload
+
+
+--------------------------------------------------------------------------------
+4. RESUME A FAILED / PARTIAL IMAGE RUN
+--------------------------------------------------------------------------------
+# NEVER start a new full GHA workflow to fix a partial image run.
+# Same RUN_ID. Completed PNGs on disk are skipped.
+
+# Option A — on VPS
+sudo bash /opt/niche/scripts/vps-resume-run.sh RUN_ID
+
+# Option B — from Windows (needs VPS_URL + VPS_SECRET env vars)
+$env:VPS_URL = "http://140.245.245.123:8765"
+$env:VPS_SECRET = "<WEBHOOK_SECRET from VPS /opt/niche/.env>"
+python src/trigger_vps.py --run-id "RUN_ID" --resume
+python src/poll_vps.py --run-id "RUN_ID" --timeout 7200
+
+# After images complete: re-run GHA wait-for-images only (same workflow run),
+# or download + render locally — do not re-run phase 1/2.
+
+
+--------------------------------------------------------------------------------
+5. STUCK / FAILED — WHAT TO DO
+--------------------------------------------------------------------------------
+
+# A) Poll stuck at N/35, status still "running", no new images for 15–20+ min
+#    → zombie or Flow throttle. Check status + logs first:
+bash /opt/niche/scripts/vps-run-status.sh RUN_ID
+sudo journalctl -u niche-image-worker -n 80 --no-pager
+
+#    If status stuck "running" with old updated_at → restart worker, then resume:
+sudo systemctl restart niche-image-worker
+sleep 3
+sudo bash /opt/niche/scripts/vps-resume-run.sh RUN_ID
+
+# B) status=failed, error has 401 / 502 / Unauthorized
+#    → Flow login expired
+#    1) SSH+VNC tunnel, sign in at labs.google/fx/tools/flow
+#    2) bash /opt/niche/scripts/vps-preflight.sh   (must pass)
+#    3) sudo bash /opt/niche/scripts/vps-resume-run.sh RUN_ID
+
+# C) status=failed or preflight generate-image 403 (UNUSUAL_ACTIVITY / reCAPTCHA)
+#    → Flow rate limit on current IP. Wait 1–2h, OR switch Chrome to VPN proxy:
+sudo bash /opt/niche/scripts/vps-xray-proxy.sh status
+sudo bash /opt/niche/scripts/vps-xray-proxy.sh start
+sudo bash /opt/niche/scripts/vps-chrome-network.sh proxy
+bash /opt/niche/scripts/vps-preflight.sh
+sudo bash /opt/niche/scripts/vps-resume-run.sh RUN_ID
+
+# D) Chrome network modes (proxy = xray VPN, direct = VPS public IP)
+sudo bash /opt/niche/scripts/vps-chrome-network.sh status
+sudo bash /opt/niche/scripts/vps-chrome-network.sh proxy
+sudo bash /opt/niche/scripts/vps-chrome-network.sh direct
+cat /opt/niche/chrome.env
+
+# E) FlowKit / extension not connected
+bash /opt/niche/scripts/restart_flowkit_stack.sh
+# or on VNC desktop:
+start-chrome-flowkit
+# then open Flow tab and confirm extension connected; re-run preflight
+
+# F) Poll timed out but VPS later finished (status=complete)
+#    → Just re-run GHA wait-for-images; images are already on disk
+
+# G) Poll 0 images for 15+ min
+#    → Job never started or FlowKit dead. Preflight → resume (same RUN_ID)
+
+
+--------------------------------------------------------------------------------
+6. XRAY / VPN PROXY
+--------------------------------------------------------------------------------
+
+sudo bash /opt/niche/scripts/vps-xray-proxy.sh status
+sudo bash /opt/niche/scripts/vps-xray-proxy.sh start
+sudo bash /opt/niche/scripts/vps-xray-proxy.sh stop
+
+# Chrome must be in proxy mode to use it:
+sudo bash /opt/niche/scripts/vps-chrome-network.sh proxy
+
+
+--------------------------------------------------------------------------------
+7. FLOWKIT / CHROME (on VPS)
+--------------------------------------------------------------------------------
+
+bash /opt/niche/scripts/restart_flowkit_stack.sh
+bash /opt/niche/scripts/start_flowkit.sh
+bash /opt/niche/scripts/stop_flowkit.sh
+
+# Health checks
+curl -s http://127.0.0.1:8100/health
+curl -s http://127.0.0.1:8765/health
+
+# Chrome processes
+pgrep -a chrome | head
+
+
+--------------------------------------------------------------------------------
+8. DEPLOY WORKER CODE (from Windows repo root)
+--------------------------------------------------------------------------------
+
+cd C:\Users\Pracheer\Music\Niche
+scp -i "ssh-key-2026-06-24.key" vps/*.py ubuntu@140.245.245.123:/tmp/
+ssh -i "ssh-key-2026-06-24.key" ubuntu@140.245.245.123 "sudo cp /tmp/*.py /opt/niche/vps/ && sudo chown niche:niche /opt/niche/vps/*.py && sudo systemctl restart niche-image-worker"
+
+
+--------------------------------------------------------------------------------
+9. DOWNLOAD IMAGES / LOCAL POLL (Windows)
+--------------------------------------------------------------------------------
+
+# Set secrets once per shell session
+$env:VPS_URL = "http://140.245.245.123:8765"
+$env:VPS_SECRET = "<WEBHOOK_SECRET>"
+
+python src/poll_vps.py --run-id "RUN_ID" --timeout 7200
+python src/download_vps_images.py --run-id "RUN_ID" --output output/images --durations output/scene_durations.json
+
+
+--------------------------------------------------------------------------------
+10. GHA / PIPELINE NOTES
+--------------------------------------------------------------------------------
+
+# Workflow: .github/workflows/pipeline.yml
+# Jobs: script-and-audio → wait-for-images → render-and-upload
+
+# If wait-for-images fails but VPS later completes:
+#   → Re-run failed jobs from GitHub Actions UI (wait-for-images + render)
+#   → Do NOT start a brand-new full workflow for the same video
+
+# Local gh workflow run may 403 — use GitHub UI as repo admin if needed.
+
+
+--------------------------------------------------------------------------------
+11. QUICK REFERENCE — MOST COMMON SEQUENCE
+--------------------------------------------------------------------------------
+
+# Login expired / after reboot / before images:
+ssh -i "ssh-key-2026-06-24.key" -L 5901:127.0.0.1:5901 ubuntu@140.245.245.123
+# VNC → localhost:5901 → Flow sign-in → start-chrome-flowkit if needed
+
+bash /opt/niche/scripts/vps-preflight.sh
+sudo bash /opt/niche/scripts/vps-chrome-network.sh proxy   # if 403 on direct IP
+sudo bash /opt/niche/scripts/vps-resume-run.sh RUN_ID
+bash /opt/niche/scripts/vps-run-status.sh RUN_ID
+
+
+--------------------------------------------------------------------------------
+12. COMMON ERROR → FIX
+--------------------------------------------------------------------------------
+
+401 / 502 on generate-image or create-project
+  → VNC Flow re-login → vps-preflight.sh → resume same RUN_ID
+
+403 UNUSUAL_ACTIVITY / reCAPTCHA
+  → Wait 1–2h OR vps-chrome-network.sh proxy → preflight → resume
+
+429 rate limit
+  → Wait; resume same RUN_ID (FLOW_RESUME_COOLDOWN_SEC=600 on resume)
+
+Poll timeout while still progressing slowly
+  → Often Fine; check VPS status later; if complete, re-run wait-for-images
+
+Zombie status=running, no progress
+  → systemctl restart niche-image-worker → vps-resume-run.sh RUN_ID
+
+================================================================================
+end
+================================================================================

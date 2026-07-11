@@ -1,8 +1,9 @@
-From the 10 topics you just listed, pick the single best NEXT video for this channel.
+From the 10 topics you just listed, pick the single best NEXT video.
 
-Past videos already made (avoid same angle):
+Series type required this run: {series_type}
+Past videos already made (avoid same case/killer):
 {past_topics}
 
-Pick for: human curiosity, search + browse CTR, and fit with reference channel style (Entire X in Y mins psychology/motivation).
+Pick for: clear public-source coverage, high curiosity CTR, and a complete story that fits ~25 minutes (up to ~30 if dense).
 
 Reply with ONLY the topic title on one line — no numbering, no explanation, no quotes.

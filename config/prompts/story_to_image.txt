@@ -1,25 +1,30 @@
-Act as a scene-by-scene 'Minimalist Stick Figure Line Art' visual breakdown engine.
+Act as a scene-by-scene visual breakdown engine for a cold true-crime channel.
 
-Use ONLY the complete story script from our conversation above. Do not invent scenes after the script ends. Do not summarize.
+Host character (when present): JONTY — large white circle head, thick black outline, small dot eyes, serious mouth, short dark hair OR black beanie (NO red baseball cap), charcoal/black shirt with red text "JONTY" on chest, thin black limbs. Cold documentary energy.
 
-Target: exactly {target_scene_count} image prompts total (across all parts). One prompt per narrated beat — no filler, no recap montage at the end.
+Use ONLY the complete story script from our conversation above. Do not invent scenes after the script ends.
 
-Task:
-- Read the script carefully
-- Split into visual beats by action, emotion, location, or idea change
-- If one sentence has 2 visual moments, split into 2 prompts (still stay within {target_scene_count} total)
-- Do NOT exceed {target_scene_count} prompts — merge minor beats if needed
-- Do NOT generate extra prompts beyond the script's ending
+Target: exactly {target_scene_count} image prompts total. One prompt per narrated beat.
 
-Style: Minimalist Stick Figure Line Art — ONE channel character (circular head, dot eyes, thin black limbs, cream/beige background). Match reference images. Infographic moments: teal/navy on beige.
+Visual mix (approximate across the whole video):
+- ~40% Jonty host beats (black void and/or over muted photo environments) — pointing, explaining, reacting coldly
+- ~35% per-case 2D characters / locations for THIS story only (new designs; name tags OK)
+- ~15% black+red fact cards (dates, ages, locations, charges — red block typography on matte black)
+- ~10% archival / documentary photo beats: desaturated real-photo look, slight blur on sensitive faces, NO gore, NO corpses, NO blood; treat as evidence stills or news clippings
 
-Each prompt: ~40-50 words, single standalone line, no numbering, no bullets.
+Safety (hard):
+- No gore, no bodies, no sexual violence imagery
+- No real child-victim faces — silhouette, blur, or omit
+- YouTube-safe; prefer implication over graphic detail
+
+Each prompt: ~40-55 words, single standalone line, no numbering, no bullets.
+No readable paragraph text in the image except short ALL-CAPS name tags or red fact labels when needed.
+Do not put the YouTube title as text in the frame.
 
 Output rules:
 First line only: Total Parts: X
 Then exactly 20 prompts in Part 1 (or fewer if {target_scene_count} < 20)
 Blank line between prompts
-No visible text, scene numbers, or titles in the image
 Stop after Part 1 and wait for "Next"
 
 {script_excerpt}

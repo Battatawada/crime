@@ -1,32 +1,40 @@
 {
-  "channel_name": "Mind in Minutes",
+  "channel_name": "Criminally Drawn",
   "shorts": {
-    "max_per_day": 3,
-    "optimal_times": ["07:00", "12:00", "17:00"]
+    "max_per_day": 0,
+    "optimal_times": []
   },
   "long_form": {
     "max_per_day": 1,
     "optimal_times": ["19:00"]
   },
   "scheduling": {
-    "min_gap_hours": 4,
+    "min_gap_hours": 36,
     "avoid_hours": [0, 1, 2, 3, 4, 5]
   },
   "seo": {
-    "niche": "mind psychology explained",
-    "default_tags": ["mind in minutes", "psychology", "human behavior", "motivation", "self improvement"],
+    "niche": "true crime animated documentary cases serial killers",
+    "default_tags": [
+      "criminally drawn",
+      "true crime",
+      "true crime documentary",
+      "animated true crime",
+      "serial killer",
+      "cold case",
+      "jonty"
+    ],
     "title_max_chars": 65,
     "region": "US",
-    "description_footer": "About Mind in Minutes\nWhy we think, feel, and act the way we do — in about 15 minutes. Psychology and human behavior explainers with stick-figure storytelling.\n\nSubscribe for new videos every week.\nhttps://www.youtube.com/@mindinminutes01\n\n#psychology #humanbehavior #mindinminutes"
+    "description_footer": "About Criminally Drawn\nReal cases. Drawn cold. Full true-crime stories in minimal 2D — narrated by Jonty.\n\nSubscribe for the next case.\nhttps://www.youtube.com/@criminallydrawn\n\n#truecrime #criminallydrawn #documentary"
   },
   "upload": {
     "privacy": "public",
-    "category_id": "27",
+    "category_id": "24",
     "made_for_kids": false,
     "self_declared_made_for_kids": false,
     "embeddable": true,
     "license": "youtube",
     "public_stats_viewable": true,
-    "contains_synthetic_media": false
+    "contains_synthetic_media": true
   }
 }

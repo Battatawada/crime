@@ -59,6 +59,8 @@ def normalize_tts_punctuation(text: str) -> str:
 def clean_script_for_tts(text: str) -> str:
     """Remove NotebookLM junk and citation markers; keep narration-only text."""
     text = strip_markdown(text)
+    # Profanity / graphic markers from true-crime prompts → spoken beep
+    text = re.sub(r"\[BEEP\]", "beep", text, flags=re.IGNORECASE)
     # Inline metadata (multi-part merges, conversation IDs, etc.)
     text = re.sub(
         r"(?i)\b(?:new conversation|continuing conversation|conversation)\s*:\s*"
@@ -476,22 +478,33 @@ def append_topic_history(
     run_id: str,
     topic: str,
     title: str,
+    series_type: str | None = None,
     max_entries: int = 30,
 ) -> None:
     existing = load_topic_history(path)
-    existing.append(
-        {
-            "run_id": run_id,
-            "topic": topic,
-            "title": title,
-            "created_at": datetime.now(timezone.utc).isoformat(),
-        }
-    )
+    row: dict[str, Any] = {
+        "run_id": run_id,
+        "topic": topic,
+        "title": title,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    if series_type:
+        row["series_type"] = series_type
+    existing.append(row)
     save_json(path, {"topics": existing[-max_entries:]})
 
 
+def next_series_type(history: list[dict[str, Any]] | None = None) -> str:
+    """Alternate incident ↔ serial_killer. First video = incident."""
+    history = history if history is not None else load_topic_history()
+    if not history:
+        return "incident"
+    last = str(history[-1].get("series_type") or "incident").strip().lower()
+    return "serial_killer" if last == "incident" else "incident"
+
+
 def prompts_to_scenes(prompts: list[str], entity_refs: list[str] | None = None) -> list[dict]:
-    refs = entity_refs or ["character_A"]
+    refs = entity_refs or ["style_host", "style_host_react", "style_fact_card", "style_case_scene"]
     return [
         {"scene_id": i + 1, "prompt": p, "entity_refs": list(refs)}
         for i, p in enumerate(prompts)
