@@ -13,9 +13,11 @@ Your job is ONLY to name publicly known cases/people that already exist in the p
 
 Generate 10 NEW topic lines for that series type only.
 
+Each line is a RESEARCH KEY for web search — include the real proper name — but phrase it with curiosity energy (not dry encyclopedia labels). Final YouTube title will be rewritten later in SEO; still make these scroll-stopping.
+
 Rules:
-- Each line must be a SPECIFIC searchable title with a proper name (person, place, or case nickname)
-- Examples of GOOD format: "The disappearance of Natalee Holloway", "Ted Bundy's Florida murders — the full timeline", "The Golden State Killer case"
+- Each line must be SPECIFIC and searchable (person, place, or case nickname)
+- Prefer intrigue phrasing over "The murder of X" / "X — the full story"
 - Must be coverable from public sources
 - Strong curiosity without gore bait ("caught", "confession", "mistake", "timeline", "who", "how")
 - US English; adult audience

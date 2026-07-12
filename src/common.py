@@ -592,20 +592,34 @@ def sanitize_seo_title(title: str, max_chars: int = 65) -> str:
 
 
 def fallback_seo(topic: str) -> dict:
-    """Rich SEO metadata when NotebookLM returns non-JSON."""
+    """Rich SEO metadata when NotebookLM returns non-JSON — never paste dry research keys as titles."""
     niche = load_json(CONFIG / "niche.json") if (CONFIG / "niche.json").exists() else {}
     channel = niche.get("name", "Criminally Drawn")
     tagline = niche.get("tagline", "Real cases. Drawn cold.")
-    title = sanitize_seo_title(topic)
+    # Research key may be dry ("Ted Bundy murders…"); wrap into curiosity title.
+    bare = sanitize_seo_title(topic)
+    bare = re.sub(
+        r"(?i)\s*[—\-–]\s*(the full (story|case|timeline)|life and crimes|timeline and evidence)\s*$",
+        "",
+        bare,
+    ).strip()
+    bare = re.sub(r"(?i)^(the )?(murder|disappearance|kidnapping|case) of\s+", "", bare).strip()
+    title = sanitize_seo_title(f"The Part They Never Explained — {bare}")
+    if len(title) > 65:
+        title = sanitize_seo_title(bare)[:65]
     description = (
         f"{tagline}\n\n"
-        f"A cold documentary retelling of {topic} — minimal 2D animation, "
-        f"public-source facts, no gore graphics.\n\n"
-        f"In this video:\n"
-        f"• What happened, in order\n"
-        f"• The people involved\n"
-        f"• How the case unfolded\n\n"
-        f"If this kept you watching, subscribe to {channel} for the next case."
+        f"Something about this case still doesn't sit right. "
+        f"Jonty walks the public record cold — what happened, who was involved, "
+        f"and where the timeline breaks — in minimal 2D, no gore graphics.\n\n"
+        f"This video covers:\n"
+        f"• The hook that made the case infamous\n"
+        f"• The people at the center of it\n"
+        f"• How investigators (and the public) got it wrong or right\n"
+        f"• What was proven — and what stayed unanswered\n\n"
+        f"Timestamps coming soon.\n\n"
+        f"Case researched: {bare}\n\n"
+        f"If this kept you watching, subscribe to {channel}. I'm Jonty."
     )
     return {
         "title": title,

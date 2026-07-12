@@ -1,12 +1,32 @@
 Create YouTube SEO for **Criminally Drawn** — cold true-crime documentary channel narrated by Jonty (~25 min full case / killer life stories, minimal 2D animation). Voice: dry, human, slightly dark humor — never goofy, never gore-bait.
 
+The "Topic / case" below is only the RESEARCH KEY (what was researched). It is NOT the YouTube title.
+
 Return ONLY valid JSON:
 {
-  "title": "curiosity + case hook, under 65 chars, no ALL CAPS spam, no gore words",
-  "description": "MINIMUM 600 characters. Structure: (1) hook paragraph in Jonty's dry human voice, (2) 3-5 plain bullets of what the video covers, (3) line 'Timestamps coming soon', (4) short subscribe CTA mentioning Criminally Drawn and Jonty once. Plain text only. No gore. No 'trust me bro' slang.",
+  "title": "eye-catching curiosity title under 65 chars",
+  "description": "MINIMUM 600 characters",
   "tags": ["8-15 specific searchable tags"],
   "hashtags": ["#truecrime", "#criminallydrawn", "plus 1-2 relevant"]
 }
 
-Topic / case:
+TITLE RULES (hard):
+- Do NOT copy the research topic / Wikipedia-style name verbatim
+- Do NOT use dry patterns like "X — the full story", "The murder of X", "X case", "life and crimes"
+- Make it intrigue-first: contradiction, unanswered question, twist, or cold detail that makes someone stop scrolling
+- Still clearly about THIS real case (viewer can tell who/what after the hook)
+- No ALL CAPS spam, no clickbait lies, no gore words, no "you won't believe"
+
+Good title energy (examples of SHAPE only — invent fresh for this case):
+- "She Was Safe. Then the Timeline Broke."
+- "He Helped Police Find a Killer. It Was Him."
+- "17 Years. One DNA Hit. No Confession."
+
+DESCRIPTION RULES (hard):
+- Do NOT paste or lightly rephrase the research topic as the opening line
+- Structure: (1) hook paragraph in Jonty's dry human voice that teases the mystery without spoiling every beat, (2) 3-5 plain bullets of what the video covers, (3) line 'Timestamps coming soon', (4) short subscribe CTA mentioning Criminally Drawn and Jonty once
+- Plain text only. No gore. No "trust me bro" slang.
+- Mention the real case/person name somewhere in the body for search, but lead with intrigue
+
+Topic / case (research key only — rewrite for title + description):
 {{topic}}
