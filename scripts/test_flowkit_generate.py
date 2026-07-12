@@ -18,9 +18,9 @@ def main() -> int:
     client.ensure_ready()
     pid = client.create_project("smoke-test", "")
     print("project_id:", pid)
-    mid = client.upload_image(refs / "character_A.png", project_id=pid)
+    mid = client.upload_image(refs / "2.png", project_id=pid)
     print("media_id:", mid)
-    prompt = "Minimalist stick figure standing at a window, cream background, line art"
+    prompt = "Minimal 2D host on matte black, bold outline, charcoal shirt red JONTY text, cold true-crime mood, no text"
     url, out_mid = client.generate_scene_image(
         project_id=pid,
         scene_id="1",

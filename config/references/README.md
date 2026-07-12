@@ -1,4 +1,4 @@
-# Flow reference images (true crime)
+# Flow reference images (true crime) — same Niche workflow
 
 Style inspiration from TrustMeBroCompilations energy — **our host is Jonty** (see `config/character_bible.json`).
 
@@ -9,11 +9,16 @@ Style inspiration from TrustMeBroCompilations energy — **our host is Jonty** (
 | `1.png` | `style_fact_card` | Red fact callouts + labeled subject |
 | `4.png` | `style_case_scene` | Per-case character mixed with real environment |
 
-## One-time: generate Jonty lockup in Google Flow
+## How Niche did it (same here)
 
-1. Open Flow on the crime Chrome profile.
-2. Prompt from `character_bible.json` → full-body Jonty, front view, black background, red **JONTY** on shirt, no red cap.
-3. Save as `config/references/host_jonty.png` and add to `manifest.json` as `host_jonty` when ready.
-4. Until then, scene prompts describe Jonty in text and use the style_* refs above.
+1. Put style PNGs + `manifest.json` in `config/references/` (local).
+2. Upload to VPS:
 
-Old psychology stick-figure PNGs (`character_A.png`, etc.) are obsolete — do not upload them to the VPS for this niche.
+```powershell
+.\scripts\upload-references.ps1
+```
+
+Destination: **`/opt/niche/config/references/`** (shared image worker).  
+Each Phase 3 run, FlowKit re-uploads these PNGs to Flow for fresh `media_id`s.
+
+Do **not** upload leftover psychology files (`character_A.png`, etc.).

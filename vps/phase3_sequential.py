@@ -112,9 +112,9 @@ def _sanitize_prompt(prompt: str, scene_id: int) -> str:
             cleaned += suffix
         return cleaned
     return (
-        "Minimalist stick figure line art, consistent circular-head character, "
-        "cream background, calm educational psychology mood, "
-        "no visible text, no labels, no scene numbers"
+        "Minimal 2D animation, bold black outlines, matte black background, "
+        "cold true-crime documentary mood, circular-head host Jonty with charcoal "
+        "shirt and red JONTY text, no gore, no visible text, no labels, no scene numbers"
     )
 
 

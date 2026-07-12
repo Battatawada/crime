@@ -3,7 +3,7 @@
 set -euo pipefail
 
 NICHE_ROOT="${NICHE_ROOT:-/opt/niche}"
-NICHE_REPO_URL="${NICHE_REPO_URL:-https://github.com/Battatawada/youtube.git}"
+NICHE_REPO_URL="${NICHE_REPO_URL:-https://github.com/Battatawada/crime.git}"
 SWAP_GB="${SWAP_GB:-4}"
 NICHE_USER="${NICHE_USER:-niche}"
 
@@ -55,7 +55,7 @@ cat <<'EOF'
 1. git clone https://github.com/crisng95/flowkit.git /opt/flowkit && cd /opt/flowkit && ./setup.sh
 2. Load extension/ in Chrome (Developer Mode) — needs GUI or VNC for first login
 3. Sign in at https://labs.google/fx/tools/flow
-4. Place reference PNGs in /opt/niche/config/references/character_A.png
+4. Place crime reference PNGs + manifest.json in /opt/niche/config/references/ (see config/references/README.md)
 5. Copy /opt/niche/deploy/niche-image-worker.service to /etc/systemd/system/
 6. Create /opt/niche/.env (see .env.example) with WEBHOOK_SECRET
 7. systemctl daemon-reload && systemctl enable --now niche-image-worker

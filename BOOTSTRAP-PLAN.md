@@ -30,7 +30,7 @@ See `config/character_bible.json`, `config/niche.json`, `config/channel_rules.js
 
 - [x] Create YouTube channel `@criminallydrawn`  
 - [ ] Generate `host_jonty.png` once in Flow; add to manifest  
-- [ ] New GitHub remote (do not push to psychology `Battatawada/youtube`)  
-- [ ] Crime Chrome profile on VNC `:2`  
+- [x] New GitHub remote → `Battatawada/crime`  
+- [x] Crime Chrome profile on VNC `:2` (`start-chrome-crime`)  
 - [ ] YouTube OAuth secrets for this channel  
 - [ ] End-card art retarget  

@@ -594,23 +594,28 @@ def sanitize_seo_title(title: str, max_chars: int = 65) -> str:
 def fallback_seo(topic: str) -> dict:
     """Rich SEO metadata when NotebookLM returns non-JSON."""
     niche = load_json(CONFIG / "niche.json") if (CONFIG / "niche.json").exists() else {}
-    channel = niche.get("name", "Mind in Minutes")
-    tagline = niche.get("tagline", "Psychology explainers in about 15 minutes.")
+    channel = niche.get("name", "Criminally Drawn")
+    tagline = niche.get("tagline", "Real cases. Drawn cold.")
     title = sanitize_seo_title(topic)
     description = (
         f"{tagline}\n\n"
-        f"In this video we break down {topic.lower()} with stick-figure stories and real psychology — "
-        f"no jargon, no fluff.\n\n"
-        f"What you'll learn:\n"
-        f"• Why this pattern shows up in everyday life\n"
-        f"• The hidden mental mechanism behind it\n"
-        f"• Practical takeaways you can use today\n\n"
-        f"Timestamps coming soon.\n\n"
-        f"If this helped, subscribe to {channel} for more psychology explainers."
+        f"A cold documentary retelling of {topic} — minimal 2D animation, "
+        f"public-source facts, no gore graphics.\n\n"
+        f"In this video:\n"
+        f"• What happened, in order\n"
+        f"• The people involved\n"
+        f"• How the case unfolded\n\n"
+        f"If this kept you watching, subscribe to {channel} for the next case."
     )
     return {
         "title": title,
         "description": description,
-        "tags": ["mind in minutes", "psychology", "human behavior", "motivation", "self improvement"],
-        "hashtags": ["#psychology", "#mindinminutes"],
+        "tags": [
+            "true crime",
+            "documentary",
+            "criminally drawn",
+            "real crime story",
+            "cold case",
+        ],
+        "hashtags": ["#truecrime", "#criminallydrawn"],
     }

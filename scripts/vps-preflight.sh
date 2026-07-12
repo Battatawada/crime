@@ -54,7 +54,7 @@ PROBE_PID=$(python3 -c "import json; d=json.load(open('/tmp/niche_flow_probe.jso
 GEN_HTTP=$(curl -s -o /tmp/niche_flow_gen_probe.json -w '%{http_code}' \
   -X POST http://127.0.0.1:8100/api/flow/generate-image \
   -H 'Content-Type: application/json' \
-  -d "{\"prompt\":\"Minimalist stick figure at a window, cream background, line art, no text\",\"project_id\":\"${PROBE_PID}\",\"aspect_ratio\":\"IMAGE_ASPECT_RATIO_LANDSCAPE\"}")
+  -d "{\"prompt\":\"Minimal 2D host on matte black background, bold outline, charcoal shirt red JONTY text, cold true-crime mood, no text overlays\",\"project_id\":\"${PROBE_PID}\",\"aspect_ratio\":\"IMAGE_ASPECT_RATIO_LANDSCAPE\"}")
 echo "HTTP $GEN_HTTP"
 head -c 300 /tmp/niche_flow_gen_probe.json && echo
 if [[ "$GEN_HTTP" == "403" ]]; then
