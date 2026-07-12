@@ -1,4 +1,9 @@
 {
+  "host_jonty": {
+    "file": "host_jonty.png",
+    "type": "character",
+    "description": "LOCKED host character Jonty for Criminally Drawn: large white circle head, thick black outline, short dark messy hair, NO red baseball cap, two black dot eyes, short serious mouth, charcoal shirt with red sans-serif JONTY chest text, matte black background, minimal 2D bold outline."
+  },
   "style_host": {
     "file": "2.png",
     "type": "style",

@@ -3,11 +3,12 @@
   "handle": "criminallydrawn",
   "host_name": "Jonty",
   "tagline": "Real cases. Drawn cold.",
-  "description": "Criminally Drawn tells real true-crime stories in cold documentary style — minimal 2D animation with occasional archival photos, narrated by Jonty.\n\nEach video covers one full incident or one serial killer's life (~25 minutes). Sourced from public reporting. No gore graphics.\n\nPlaylists: Incidents · Serial Killers\n\nSubscribe for the next case.\nhttps://www.youtube.com/@criminallydrawn",
-  "audience": "adult true-crime viewers who want factual, complete case storytelling in animated documentary form",
+  "description": "Real cases. Drawn cold.\n\nI'm Jonty. I draw true crime like a crime board someone cleaned up — circle head, charcoal shirt, red name on the chest, zero jump-scare energy. Every video is one full story: a single incident or one serial killer's life, about 25 minutes, from public reporting. Minimal 2D. A few archival photos. No gore graphics. No \"trust me bro\" bit. Just the facts, in order, until the room goes quiet.\n\nIf you like true crime that treats you like an adult and still somehow looks like a stick figure got a documentary budget… you're in the right place.\n\nWhat you'll find here\n• Incidents — one case, start to finish\n• Serial Killers — one life, the whole arc\n\nNew case when it's ready. Subscribe so you don't miss the next one that shouldn't have happened.\n\nhttps://www.youtube.com/@criminallydrawn\n\n#truecrime #criminallydrawn #documentary #animatedtruecrime",
+  "audience": "adult true-crime viewers who want factual, complete case storytelling in animated documentary form — dry humor welcome, gore not",
   "topic_format": "{case_or_killer} — the full story",
   "series_types": ["incident", "serial_killer"],
   "geography": "Worldwide cases allowed; prefer famous US cases while the channel is new",
   "duration_minutes_target": 25,
-  "duration_minutes_max": 30
+  "duration_minutes_max": 30,
+  "youtube_email": "criminallydrawn@gmail.com"
 }

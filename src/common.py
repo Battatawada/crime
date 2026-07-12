@@ -615,7 +615,9 @@ def fallback_seo(topic: str) -> dict:
             "documentary",
             "criminally drawn",
             "real crime story",
+            "animated true crime",
+            "jonty",
             "cold case",
         ],
-        "hashtags": ["#truecrime", "#criminallydrawn"],
+        "hashtags": ["#truecrime", "#criminallydrawn", "#documentary"],
     }

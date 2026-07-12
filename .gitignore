@@ -14,6 +14,7 @@ venv/
 *.png
 !config/end_card/subscribe.png
 !config/references/*.png
+!config/branding/*.png
 *.vtt
 !.gitkeep
 ssh-key-*.key

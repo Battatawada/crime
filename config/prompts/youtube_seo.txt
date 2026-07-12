@@ -1,21 +1,12 @@
-Create YouTube SEO for **Criminally Drawn** — cold true-crime documentary channel narrated by Jonty (~25 min full case / killer life stories, minimal 2D animation).
+Create YouTube SEO for **Criminally Drawn** — cold true-crime documentary channel narrated by Jonty (~25 min full case / killer life stories, minimal 2D animation). Voice: dry, human, slightly dark humor — never goofy, never gore-bait.
 
-Topic: {topic}
-
-Past videos (differentiate — do not copy these titles):
-{past_topics}
-
-Output ONLY valid JSON (no markdown, no ** bold, no backticks):
+Return ONLY valid JSON:
 {
-  "title": "max 65 chars — curiosity hook a human would click; name the case or killer when possible",
-  "description": "MINIMUM 600 characters. Structure: (1) hook paragraph, (2) 3-5 plain bullets of what the video covers, (3) line 'Timestamps coming soon', (4) short subscribe CTA mentioning Criminally Drawn and Jonty once. Plain text only. No gore.",
-  "tags": ["tag1", ... max 15, US search intent true crime],
-  "hashtags": ["#tag1", ... max 5]
+  "title": "curiosity + case hook, under 65 chars, no ALL CAPS spam, no gore words",
+  "description": "MINIMUM 600 characters. Structure: (1) hook paragraph in Jonty's dry human voice, (2) 3-5 plain bullets of what the video covers, (3) line 'Timestamps coming soon', (4) short subscribe CTA mentioning Criminally Drawn and Jonty once. Plain text only. No gore. No 'trust me bro' slang.",
+  "tags": ["8-15 specific searchable tags"],
+  "hashtags": ["#truecrime", "#criminallydrawn", "plus 1-2 relevant"]
 }
 
-Title rules:
-- Curiosity + specificity (who / how caught / the mistake / the full story)
-- No ALL CAPS, no emoji spam, no "you won't believe"
-- No gore words (blood, rape, torture) in the title
-
-Description: factual, respectful to victims, clear spoiler-aware but not graphic.
+Topic / case:
+{{topic}}

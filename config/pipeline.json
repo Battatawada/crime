@@ -1,7 +1,7 @@
 {
   "duration_minutes": 25,
   "duration_minutes_max": 30,
-  "default_entity_refs": ["style_host", "style_host_react", "style_fact_card", "style_case_scene"],
+  "default_entity_refs": ["host_jonty", "style_host", "style_host_react", "style_fact_card", "style_case_scene"],
   "image_style": "Minimal 2D bold-outline true-crime (Jonty host + per-case characters + black/red fact cards + rare archival photo beats)",
   "prompts_per_part": 20,
   "continue_keyword": "Next",
