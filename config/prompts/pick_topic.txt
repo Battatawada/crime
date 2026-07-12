@@ -4,6 +4,9 @@ Series type required this run: {series_type}
 Past videos already made (avoid same case/killer):
 {past_topics}
 
+The notebook may still be empty — that is OK. Pick from the numbered list only.
+
 Pick for: clear public-source coverage, high curiosity CTR, and a complete story that fits ~25 minutes (up to ~30 if dense).
 
-Reply with ONLY the topic title on one line — no numbering, no explanation, no quotes.
+Reply with ONLY the topic title on one line — no numbering, no explanation, no quotes, no refusal.
+If you cannot choose, repeat topic #1's title exactly.

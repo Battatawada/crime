@@ -1,18 +1,26 @@
 Channel: Criminally Drawn. Host: Jonty (cold documentary narrator). Real true-crime stories in minimal 2D animation.
 
+This step runs BEFORE web research. The notebook may be empty — that is EXPECTED and OK.
+
 Past videos we ALREADY published (do NOT repeat or closely rephrase):
 {past_topics}
 
 This upload's series type: {series_type}
-- If series_type is "incident": propose ONE real-life crime/incident cases (single event or investigation), fully tellable in ~25 minutes. Prefer famous US cases while building the library; worldwide OK.
-- If series_type is "serial_killer": propose ONE serial killer life stories (focus famous US names first; worldwide OK).
+- If series_type is "incident": list 10 well-documented real crime INCIDENTS (single case / investigation / event). Prefer famous US cases; worldwide OK.
+- If series_type is "serial_killer": list 10 well-documented real serial killers (prefer famous US names first; worldwide OK).
+
+Your job is ONLY to name publicly known cases/people that already exist in the public record (Wikipedia / major news / court reporting). We will run NotebookLM web research on the chosen title NEXT. You are not inventing crimes and you are not writing the story yet.
 
 Generate 10 NEW topic lines for that series type only.
 
 Rules:
-- Factual, specific, searchable (name the case or killer)
-- Must be coverable from public sources (Wikipedia-level + reputable reporting)
+- Each line must be a SPECIFIC searchable title with a proper name (person, place, or case nickname)
+- Examples of GOOD format: "The disappearance of Natalee Holloway", "Ted Bundy's Florida murders — the full timeline", "The Golden State Killer case"
+- Must be coverable from public sources
 - Strong curiosity without gore bait ("caught", "confession", "mistake", "timeline", "who", "how")
-- US English; adult audience; no "you won't believe" spam
+- US English; adult audience
 - Do NOT invent fictional crimes
+- Do NOT refuse because the notebook is empty
+- Do NOT say you cannot generate topics — list real public cases by name
 - One topic per line, numbered 1–10 only
+- Output ONLY the numbered list — no preface, no apology, no explanation

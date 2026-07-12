@@ -179,7 +179,41 @@ def ask(
     raise RuntimeError(last_err)
 
 
-_BAD_TOPIC = re.compile(r"continuing conversation|^[a-f0-9]{8,}$", re.IGNORECASE)
+_BAD_TOPIC = re.compile(
+    r"continuing conversation|^[a-f0-9]{8,}$|"
+    r"notebook is empty|no true-crime topics|do not generate|"
+    r"haven'?t performed any research|from my training data|"
+    r"i (cannot|can'?t|do not|don'?t) (generate|propose|provide|list)|"
+    r"as an ai|i'?m unable|unable to (generate|provide|list)|"
+    r"^since your notebook|^to ensure the case",
+    re.IGNORECASE,
+)
+
+
+def _looks_like_topic_refusal(text: str) -> bool:
+    t = (text or "").strip()
+    if not t:
+        return True
+    if _BAD_TOPIC.search(t):
+        return True
+    numbered = re.findall(r"(?m)^\s*\d+[\).\]]\s+\S+", t)
+    return len(numbered) < 3
+
+
+def _seed_topics_block(series_type: str) -> str:
+    seeds = load_json(CONFIG / "topic_seeds.json") if (CONFIG / "topic_seeds.json").exists() else {}
+    items = seeds.get(series_type) or seeds.get("incident") or []
+    history = {str(h.get("topic", "")).strip().lower() for h in load_topic_history()}
+    lines: list[str] = []
+    for item in items:
+        if str(item).strip().lower() in history:
+            continue
+        lines.append(str(item).strip())
+        if len(lines) >= 10:
+            break
+    if not lines:
+        lines = [str(x).strip() for x in (items[:10] or ["Ted Bundy — life and crimes"])]
+    return "\n".join(f"{i}. {t}" for i, t in enumerate(lines, 1))
 
 
 def _first_topic_from_list(topics_raw: str) -> str:
@@ -531,11 +565,39 @@ def main() -> None:
             .replace("{series_type}", series_type)
         )
         topics_raw = ask(notebook_id, topics_prompt, new=True)
+        if _looks_like_topic_refusal(topics_raw):
+            print(
+                "  Warning: NotebookLM refused/empty topic list — "
+                "retrying with explicit public-case instruction...",
+                flush=True,
+            )
+            retry_prompt = (
+                topics_prompt
+                + "\n\nCRITICAL: Output a numbered 1-10 list of real public case titles NOW. "
+                "Empty notebook is fine. No refusal text."
+            )
+            topics_raw = ask(notebook_id, retry_prompt, new=False)
+        if _looks_like_topic_refusal(topics_raw):
+            print(
+                "  Warning: still no usable topics from NotebookLM — "
+                f"using local topic_seeds.json ({series_type})",
+                flush=True,
+            )
+            topics_raw = _seed_topics_block(series_type)
         (out / "topics_list.txt").write_text(topics_raw, encoding="utf-8")
 
         print("[Step 2] Pick topic...", flush=True)
         topic = pick_topic(notebook_id, topics_raw, past_topics, series_type)
+        if _BAD_TOPIC.search(topic) or _looks_like_topic_refusal(topic):
+            print("  Warning: pick looked like a refusal — using first seeded/listed topic", flush=True)
+            topic = _first_topic_from_list(topics_raw)
         print(f"  -> {topic}", flush=True)
+
+        if len(topic) > 180 or topic.lower().startswith("since "):
+            raise RuntimeError(
+                f"Refusing to research invalid topic ({topic[:120]}...). "
+                "Re-run after NotebookLM auth refresh / prompt fix."
+            )
 
         print("[Step 2b] Web research for topic...", flush=True)
         research_ids = add_web_research(notebook_id, topic, pipeline)
