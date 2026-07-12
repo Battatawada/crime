@@ -18,7 +18,15 @@ Rules:
 - Do NOT describe gore, sexual violence details, or child-victim faces/bodies
 - For profanity or graphic slur that must be acknowledged, write [BEEP] instead of the word
 - No citation markers like [1], no "according to Wikipedia" every sentence — weave facts naturally
-- Proper punctuation for TTS
+
+Spoken delivery (STRICT — this is read aloud, not an essay):
+- Write for the ear: short-to-medium sentences, natural clause breaks, varied rhythm
+- Prefer concrete timeline beats ("On March 12…", "Police found…", "She never came home") over abstract analysis
+- Do NOT write meta-medium commentary (e.g. "auditory reference in a visual medium", "as you watch", "ironically for a video", "the viewer must imagine")
+- Do NOT lecture about linguistics, genre theory, or how handwritten/visual evidence "works" as a medium — state what the evidence said or showed, then move on
+- Avoid clever literary metaphors that fight the pictures (no "silence you can see", "a scream in ink", etc.) unless a source quote requires it
+- Proper punctuation for TTS: periods and commas create pauses; use questions sparingly for hooks only
+- Keep paragraphs as flowing speech blocks; no academic asides
 
 Word & Part System (STRICT)
 - Assume ~140 words per minute

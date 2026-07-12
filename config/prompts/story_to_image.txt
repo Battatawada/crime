@@ -5,6 +5,7 @@ Host character (when present): JONTY — large white circle head, thick black ou
 Use ONLY the complete story script from our conversation above. Do not invent scenes after the script ends.
 
 Target: exactly {target_scene_count} image prompts total. One prompt per narrated beat.
+Each image must match what that beat is saying on screen — show the people, place, evidence, or fact card for that line. Do not invent abstract metaphor visuals that fight the narration.
 
 Visual mix (approximate across the whole video):
 - ~40% Jonty host beats (black void and/or over muted photo environments) — pointing, explaining, reacting coldly

@@ -2,7 +2,7 @@
 """
 Phase 2 — edge-tts
 
-  Cold documentary narrator (default: en-US-ChristopherNeural).
+  Cold documentary narrator (default: en-US-AndrewMultilingualNeural).
   Per-scene audio + word_timings.json for karaoke captions + captions.srt
 """
 
@@ -22,7 +22,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import edge_tts
 
 from captions import (
-    CHRISTOPHER,
+    ANDREW,
     attach_punctuation_from_text,
     estimate_word_timings,
     merge_srt_blocks,
@@ -31,7 +31,7 @@ from captions import (
 )
 from common import CONFIG, clean_script_for_tts, load_json, save_json, split_script_for_scenes
 
-DEFAULT_VOICES = [CHRISTOPHER]
+DEFAULT_VOICES = [ANDREW]
 MAX_TTS_RETRIES = 4
 EMPTY_SCENE_SEC = 0.35
 
@@ -256,8 +256,11 @@ def main() -> None:
     voices = pipeline.get("tts_voices") or DEFAULT_VOICES
     if isinstance(voices, str):
         voices = [voices]
+    env_voice = os.environ.get("TTS_VOICE", "").strip()
+    if env_voice:
+        voices = [env_voice]
     voices = [resolve_voice(v) for v in voices]
-    rate = os.environ.get("TTS_RATE") or pipeline.get("tts_rate", "-5%")
+    rate = args.rate or os.environ.get("TTS_RATE") or pipeline.get("tts_rate", "-3%")
 
     try:
         asyncio.run(run_phase(args.input, args.output, voices, rate))

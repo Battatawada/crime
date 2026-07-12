@@ -17,7 +17,7 @@ Sibling of `C:\Users\Pracheer\Music\Psychology` (Mind In Minutes).
 | Sources | NotebookLM web research; empty `seed_urls` OK |
 | Visuals | 2D + light archival stills; Flow for generated art |
 | Captions | Red karaoke highlight |
-| Voice | `en-US-ChristopherNeural` |
+| Voice | `en-US-AndrewMultilingualNeural` |
 
 See `config/character_bible.json`, `config/niche.json`, `config/channel_rules.json`, `config/branding/`.
 
