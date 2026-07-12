@@ -5,7 +5,7 @@ Phase 1 — NotebookLM (steps 1–3, 5, 8 of manual workflow)
   1. Ingest niche links
   2. Generate top 10 topics → pick one
   3. Multi-part story script (TTS-ready, duration-accurate word count)
-  5. Multi-part image prompts (chibi, one visual per prompt)
+  5. Multi-part image prompts (Jonty / case visuals)
   8. US YouTube SEO JSON (title, description, tags)
 """
 

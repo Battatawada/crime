@@ -3,6 +3,6 @@
 | File | Use |
 |------|-----|
 | `channel_profile.png` | YouTube channel profile picture (Jonty lockup) |
+| `../end_card/subscribe.png` | Video end / subscribe slide (wired in `config/pipeline.json`) |
 
-Generated via FlowKit on VPS using style refs `2.png` / `3.png` + character bible.  
-Same art also saved as `config/references/host_jonty.png` for Phase 3 entity refs.
+Generated via FlowKit on VPS. Host lockup also at `config/references/host_jonty.png`.

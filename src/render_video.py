@@ -116,11 +116,11 @@ def _probe_duration(path: Path) -> float:
 
 
 def _ensure_end_card_image(work: Path, script: str) -> Path:
-    """Generate a consistent subscribe slide if config/end_card/subscribe.png is missing."""
+    """Fallback subscribe slide if config/end_card/subscribe.png is missing (Criminally Drawn)."""
     dest = work / "end_card_subscribe.png"
-    line1 = "If you enjoyed this video,"
-    line2 = "please consider subscribing"
-    line3 = "Thank you for watching"
+    line1 = "CRIMINALLY DRAWN"
+    line2 = "Subscribe for the next case"
+    line3 = "Real cases. Drawn cold."
     if script:
         parts = [p.strip() for p in script.replace("!", ".").split(".") if p.strip()]
         if parts:
@@ -128,16 +128,16 @@ def _ensure_end_card_image(work: Path, script: str) -> Path:
         if len(parts) > 1:
             line3 = parts[-1][:55]
     text_filter = (
-        f"drawtext=text='{line1}':fontcolor=0x2C3E50:fontsize=56:"
-        f"x=(w-text_w)/2:y=h*0.38:fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf,"
-        f"drawtext=text='{line2}':fontcolor=0x2C3E50:fontsize=48:"
-        f"x=(w-text_w)/2:y=h*0.48:fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf,"
-        f"drawtext=text='{line3}':fontcolor=0x5D6D7E:fontsize=40:"
+        f"drawtext=text='{line1}':fontcolor=0xFFFFFF:fontsize=64:"
+        f"x=(w-text_w)/2:y=h*0.36:fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf,"
+        f"drawtext=text='{line2}':fontcolor=0xE10600:fontsize=42:"
+        f"x=(w-text_w)/2:y=h*0.48:fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf,"
+        f"drawtext=text='{line3}':fontcolor=0xAAAAAA:fontsize=36:"
         f"x=(w-text_w)/2:y=h*0.58:fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
     )
     _run(
         [
-            "ffmpeg", "-y", "-f", "lavfi", "-i", f"color=c={BG_COLOR}:s=1920x1080:d=1",
+            "ffmpeg", "-y", "-f", "lavfi", "-i", "color=c=0x000000:s=1920x1080:d=1",
             "-vf", text_filter, "-frames:v", "1", str(dest),
         ]
     )
