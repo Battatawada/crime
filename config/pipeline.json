@@ -19,8 +19,8 @@
   "source_add_delay_sec": 5,
   "research_mode": "deep",
   "research_timeout": 1800,
-  "tts_voices": ["en-US-AndrewMultilingualNeural"],
-  "tts_rate": "-3%",
+  "tts_voices": ["en-IE-EmilyNeural", "en-US-AndrewMultilingualNeural"],
+  "tts_rate": "-5%",
   "max_zoom": 1.0,
   "letterbox_color": "0x000000",
   "caption_highlight": "red",
@@ -28,6 +28,6 @@
     "enabled": true,
     "image": "config/end_card/subscribe.png",
     "script": "If you want the next real case drawn the same way, subscribe to Criminally Drawn. I'm Jonty. Thank you for watching.",
-    "voice": "en-US-AndrewMultilingualNeural"
+    "voice": "en-IE-EmilyNeural"
   }
 }

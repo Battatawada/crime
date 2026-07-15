@@ -2,7 +2,7 @@
 """
 Phase 2 — edge-tts
 
-  Cold documentary narrator (default: en-US-AndrewMultilingualNeural).
+  Dual narrators like Mind In Minutes — Emily primary, Andrew every 4th scene.
   Per-scene audio + word_timings.json for karaoke captions + captions.srt
 """
 
@@ -23,6 +23,7 @@ import edge_tts
 
 from captions import (
     ANDREW,
+    EMILY,
     attach_punctuation_from_text,
     estimate_word_timings,
     merge_srt_blocks,
@@ -31,7 +32,7 @@ from captions import (
 )
 from common import CONFIG, clean_script_for_tts, load_json, save_json, split_script_for_scenes
 
-DEFAULT_VOICES = [ANDREW]
+DEFAULT_VOICES = [EMILY, ANDREW]
 MAX_TTS_RETRIES = 4
 EMPTY_SCENE_SEC = 0.35
 

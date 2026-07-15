@@ -199,14 +199,15 @@ def merge_srt_blocks(blocks: list[str], offsets: list[float]) -> str:
 
 def pick_narrator_voice(scene_index: int, voices: list[str], segment_text: str) -> str:
     """
-    Primary voice for all scenes when only one is configured (true-crime default).
-    If two+ voices: primary most scenes; secondary every 4th (legacy psychology mix).
+    Mind In Minutes mix: Emily primary (~75%); Andrew every 4th scene
+    (0-based indices 3, 7, 11…). Single-voice configs stay on that voice only.
     """
     if not voices:
-        return CHRISTOPHER
+        return EMILY
     if len(voices) == 1:
         return voices[0]
-    primary, secondary = voices[0], voices[1]
+    primary = next((v for v in voices if "Emily" in v), voices[0])
+    secondary = next((v for v in voices if "Andrew" in v), voices[-1])
     if scene_index % 4 == 3:
         return secondary
     return primary
