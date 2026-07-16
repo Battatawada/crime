@@ -717,6 +717,8 @@ def main() -> None:
 
         thumbnail_meta = None
         if pipeline.get("generate_thumbnail", True):
+            from thumbnail_quality import is_weak_thumbnail_prompt, sanitize_thumbnail_prompt
+
             print("[Step 6] Thumbnail prompt...", flush=True)
             thumb_prompt = (
                 load_prompt("thumbnail.txt")
@@ -725,6 +727,18 @@ def main() -> None:
             )
             thumb_raw = ask(notebook_id, thumb_prompt, new=True)
             thumb_line = " ".join(thumb_raw.strip().splitlines()[0].split()).strip('"')
+            if is_weak_thumbnail_prompt(thumb_line):
+                print("  Weak thumbnail prompt — retrying with stricter CTR brief...", flush=True)
+                retry = (
+                    thumb_prompt
+                    + "\n\nCRITICAL RETRY: Reject question-mark collages, labeled evidence forms, "
+                    "white borders, and empty bars. One large adult/object hero, edge-to-edge 16:9."
+                )
+                thumb_raw = ask(notebook_id, retry, new=True)
+                thumb_line = " ".join(thumb_raw.strip().splitlines()[0].split()).strip('"')
+            thumb_line = sanitize_thumbnail_prompt(
+                thumb_line, title=seo.get("title", topic), topic=topic
+            )
             if len(thumb_line) > 30:
                 thumbnail_meta = {
                     "prompt": thumb_line,

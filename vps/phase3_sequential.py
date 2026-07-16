@@ -14,6 +14,12 @@ from typing import Any, Callable
 
 from flowkit_client import FlowKitClient
 from ref_loader import refs_dir_from_env, upload_references, verify_references
+from thumbnail_quality import (
+    MIN_THUMB_BYTES,
+    crop_thumbnail_letterbox,
+    sanitize_thumbnail_prompt,
+    thumbnail_meets_quality,
+)
 
 CHROME_NETWORK_SCRIPT = Path(
     os.environ.get("CHROME_NETWORK_SCRIPT", "/opt/niche/scripts/vps-chrome-network.sh")
@@ -326,24 +332,32 @@ class SequentialGenerator:
         if not thumb_json.exists():
             return
         thumb_meta = json.loads(thumb_json.read_text(encoding="utf-8"))
-        prompt = str(thumb_meta.get("prompt", "")).strip()
-        if not prompt:
+        raw_prompt = str(thumb_meta.get("prompt", "")).strip()
+        if not raw_prompt:
             return
 
         dest = self.images_dir / "thumbnail.png"
-        if dest.exists() and dest.stat().st_size > 10_000:
-            state["thumbnail_ready"] = True
-            self._save_state(state)
-            return
+        if dest.exists() and thumbnail_meets_quality(dest):
+            crop_thumbnail_letterbox(dest)
+            if thumbnail_meets_quality(dest):
+                state["thumbnail_ready"] = True
+                self._save_state(state)
+                return
+            dest.unlink(missing_ok=True)
 
         state["phase"] = "thumbnail"
         self._save_state(state)
         entity_refs = thumb_meta.get("entity_refs") or []
         media_inputs = [ref_media[r] for r in entity_refs if r in ref_media]
-        prompt = _sanitize_prompt(prompt, 0)
-        prompt += ", YouTube thumbnail composition, bold focal subject, high contrast, no visible text"
+        prompt = sanitize_thumbnail_prompt(
+            raw_prompt,
+            title=str(thumb_meta.get("title", "")),
+            topic=str(thumb_meta.get("topic", "")),
+        )
+        thumb_retries = max(self.max_retries, 5)
+        last_err = ""
 
-        for attempt in range(1, self.max_retries + 1):
+        for attempt in range(1, thumb_retries + 1):
             try:
                 image_url, _ = self.client.generate_scene_image(
                     project_id=project_id,
@@ -351,16 +365,27 @@ class SequentialGenerator:
                     video_id=video_id,
                     prompt=prompt,
                     ref_media_ids=media_inputs,
+                    orientation="landscape",
                 )
                 self.client.download_url(image_url, dest)
-                if dest.stat().st_size < 10_000:
-                    raise RuntimeError(f"Thumbnail too small: {dest}")
+                crop_thumbnail_letterbox(dest)
+                if not thumbnail_meets_quality(dest, min_bytes=MIN_THUMB_BYTES):
+                    size = dest.stat().st_size if dest.exists() else 0
+                    dest.unlink(missing_ok=True)
+                    raise RuntimeError(f"Thumbnail failed quality gate ({size} bytes)")
                 state["thumbnail_ready"] = True
                 self._save_state(state)
-                print(f"Thumbnail saved {dest}", flush=True)
+                print(f"Thumbnail saved {dest} ({dest.stat().st_size} bytes)", flush=True)
                 return
             except Exception as exc:  # noqa: BLE001
                 last_err = str(exc)
+                # Safety/policy 400s → swap to high-CTR safe fallback (still edge-to-edge)
+                if "400" in last_err or "quality gate" in last_err.lower():
+                    prompt = sanitize_thumbnail_prompt(
+                        "",
+                        title=str(thumb_meta.get("title", "")),
+                        topic=str(thumb_meta.get("topic", "")),
+                    )
                 mode = state.get("chrome_network_mode", _read_chrome_network_mode())
                 if "403" in last_err and mode == "proxy" and _switch_chrome_network("direct"):
                     state["chrome_network_mode"] = "direct"
@@ -370,10 +395,11 @@ class SequentialGenerator:
                     continue
                 is_rate_limit = "429" in last_err or "403" in last_err
                 wait = (120 * attempt) if is_rate_limit else self.delay
-                if attempt == self.max_retries:
-                    print(f"Thumbnail generation failed (non-fatal): {exc}", flush=True)
-                    return
-                print(f"Thumbnail retry {attempt}/{self.max_retries}, wait {wait}s", flush=True)
+                if attempt == thumb_retries:
+                    raise RuntimeError(
+                        f"Thumbnail generation failed after {thumb_retries} attempts: {last_err}"
+                    ) from exc
+                print(f"Thumbnail retry {attempt}/{thumb_retries}, wait {wait}s", flush=True)
                 time.sleep(wait)
 
 

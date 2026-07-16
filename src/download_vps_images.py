@@ -55,6 +55,8 @@ def main() -> None:
 
     # Save inside images/ so the GHA `images` artifact ships the thumbnail
     # (parent-only path was dropped before render/upload).
+    from thumbnail_quality import crop_thumbnail_letterbox, thumbnail_meets_quality
+
     thumb_dest = args.output / "thumbnail.png"
     try:
         httpx_download_with_retry(
@@ -64,15 +66,19 @@ def main() -> None:
             timeout=180.0,
             retries=3,
         )
-        if thumb_dest.stat().st_size >= 10_000:
+        if crop_thumbnail_letterbox(thumb_dest):
+            print(f"cropped letterbox on {thumb_dest}")
+        if thumbnail_meets_quality(thumb_dest):
             print(f"saved {thumb_dest} ({thumb_dest.stat().st_size // 1024}KB)")
             parent_thumb = args.output.parent / "thumbnail.png"
             parent_thumb.write_bytes(thumb_dest.read_bytes())
             print(f"copied {parent_thumb}")
         else:
-            print(f"thumbnail.png too small: {thumb_dest.stat().st_size} bytes")
+            size = thumb_dest.stat().st_size if thumb_dest.exists() else 0
+            raise RuntimeError(f"thumbnail.png failed quality gate ({size} bytes)")
     except Exception as exc:  # noqa: BLE001
         print(f"thumbnail.png not available: {exc}")
+        raise
 
     print(f"Downloaded {len(filenames)} scene images")
 

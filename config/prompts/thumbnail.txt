@@ -1,13 +1,32 @@
-Create ONE YouTube thumbnail image prompt for this true-crime video.
+Create ONE YouTube thumbnail IMAGE PROMPT for this true-crime video.
 
 Topic: {topic}
-Video title (for mood, do NOT render as readable paragraph text): {title}
+Video title (mood only — NEVER paint these words into the image): {title}
 
-Style:
-- High-contrast curiosity thumbnail in TrustMeBro-inspired energy but ORIGINAL
-- Prefer: mystery collage (desaturated face with scribble + large white "?") OR Jonty (charcoal shirt, red JONTY text, no red cap) pointing at a blurred evidence photo
-- Matte black or dark documentary background
-- Leave empty space in top third for title overlay (no long words in the image; short ALL-CAPS name tag OK)
-- Punchy, morbid curiosity — NOT gore, NOT corpses, NOT blood
+Goal: scroll-stopping CTR thumbnail that looks like a premium documentary still, not a generic AI collage.
 
-Output ONLY the image prompt as one standalone line (~45 words). No numbering, no quotes, no explanation.
+HARD composition (must obey):
+- Exact framing: edge-to-edge 16:9 YouTube thumbnail — fill the ENTIRE frame
+- NO white borders, NO letterboxing, NO empty top/bottom bars, NO polaroid/frame/mat
+- ONE dominant focal subject (close or medium-close). Subject must be large and readable at phone size
+- High contrast, sharp lighting, cinematic color grade (cold teal/blue + caution red accents OR stark B&W with one red accent)
+- Matte black / deep charcoal environment that still has depth (rim light, fog, lamp, rain glass) — not a flat void
+- Leave a dark quieter zone on the LEFT or RIGHT third for later title overlay — but still fill that zone with atmosphere (shadow, wall, night exterior), never blank white/empty canvas
+- ZERO readable text in the image (no documents titled FORENSIC EVIDENCE, no captions, no watermarks, no logos, no ALL-CAPS labels, no "JONTY" unless using host lockup refs)
+- NO giant question marks, NO emoji, NO sticker badges, NO collage of tiny scattered props
+- NO gore, NO corpses, NO blood pools, NO weapons pointed at camera
+- NO children, NO minors, NO child pageant imagery, NO blurred child faces — adults only, or objects/locations only
+- Prefer adult face emotion / host Jonty (charcoal shirt) reacting OR one iconic adult evidence object (handwritten page, tape recorder, night house exterior, courtroom door) as the hero — not a busy multi-panel layout
+
+Strong patterns to prefer (pick ONE):
+1) Extreme close-up adult eyes/face half in shadow + one sharp red accent light
+2) Host Jonty mid-frame pointing/reacting toward a single blurred adult evidence photo behind him
+3) Night exterior of a house filling the frame with one lit window and heavy contrast (subject must be large)
+
+Weak patterns to AVOID:
+- Small scene floating in white/black empty canvas
+- Stack of labeled forms / "evidence folders" with readable headers
+- Centered glowing "?" over a dull collage
+- Tiny house + tiny props with no clear hero
+
+Output ONLY the image prompt as one standalone line (55–85 words). No numbering, no quotes, no explanation.
