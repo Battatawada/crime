@@ -13,16 +13,47 @@ jobs:
   script-and-audio:
     runs-on: ubuntu-latest
     timeout-minutes: 120
+    permissions:
+      contents: write
+      actions: read
     outputs:
       run_id: ${{ steps.meta.outputs.run_id }}
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/download-artifact@v4
+      # download-artifact only sees THIS run — so topic-history never restored before.
+      # Prefer committed config/topic_history.json, then overlay newest artifact if any.
+      - name: Restore topic history from latest artifact
         continue-on-error: true
-        with:
-          name: topic-history
-          path: config
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          ARTIFACT_ID=$(gh api "repos/${{ github.repository }}/actions/artifacts?name=topic-history&per_page=5" \
+            --jq '[.artifacts[] | select(.expired==false)][0].id // empty')
+          if [ -z "${ARTIFACT_ID}" ]; then
+            echo "No prior topic-history artifact — using committed config/topic_history.json"
+            exit 0
+          fi
+          echo "Downloading topic-history artifact id=${ARTIFACT_ID}"
+          gh api "repos/${{ github.repository }}/actions/artifacts/${ARTIFACT_ID}/zip" > /tmp/topic-history.zip
+          unzip -o /tmp/topic-history.zip -d /tmp/topic-history-out
+          if [ -f /tmp/topic-history-out/topic_history.json ]; then
+            cp /tmp/topic-history-out/topic_history.json config/topic_history.json
+          elif [ -f /tmp/topic-history-out/config/topic_history.json ]; then
+            cp /tmp/topic-history-out/config/topic_history.json config/topic_history.json
+          else
+            echo "Artifact zip missing topic_history.json; keeping committed file"
+            find /tmp/topic-history-out -type f -print
+          fi
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path("config/topic_history.json")
+          data = json.loads(p.read_text(encoding="utf-8"))
+          n = len(data.get("topics", data if isinstance(data, list) else []))
+          print(f"topic_history entries: {n}")
+          PY
 
       - uses: actions/setup-python@v5
         with:
@@ -103,6 +134,24 @@ jobs:
           name: topic-history
           path: config/topic_history.json
           if-no-files-found: warn
+
+      - name: Persist topic history to main
+        if: success()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add config/topic_history.json
+          if git diff --staged --quiet; then
+            echo "topic_history.json unchanged"
+            exit 0
+          fi
+          git commit -m "chore: update topic history after ${{ steps.meta.outputs.run_id }}"
+          # Rebase if another run pushed history first
+          git pull --rebase origin HEAD || true
+          git push origin HEAD:${{ github.ref_name }}
 
   wait-for-images:
     needs: script-and-audio

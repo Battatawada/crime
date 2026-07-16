@@ -449,6 +449,122 @@ def align_scenes_to_narration(
     return prompts, segments
 
 
+# One published video = entire case is closed. Aliases catch angle/title rewrites.
+CASE_ALIAS_GROUPS: list[frozenset[str]] = [
+    frozenset({"jonbenet", "jonbenét", "ramsey", "jonbenet ramsey", "jonbenét ramsey", "boulder ransom"}),
+    frozenset({"gabby petito", "petito", "brian laundrie", "laundrie"}),
+    frozenset({"laci peterson", "scott peterson", "peterson"}),
+    frozenset({"natalee holloway", "holloway", "jeroen niemoller", "van der sloot"}),
+    frozenset({"elizabeth smart", "brian david mitchell", "wandering to zion"}),
+    frozenset({"menendez", "menendez brothers", "lyle menendez", "erik menendez"}),
+    frozenset({"chandra levy", "condit"}),
+    frozenset({"travis alexander", "jodi arias"}),
+    frozenset({"dc sniper", "john allen muhammad", "lee boyd malvo", "malvo"}),
+    frozenset({"zodiac", "zodiac killer"}),
+    frozenset({"ted bundy", "bundy", "chi omega"}),
+    frozenset({"jeffrey dahmer", "dahmer"}),
+    frozenset({"john wayne gacy", "gacy", "killer clown"}),
+    frozenset({"btk", "dennis rader", "rader"}),
+    frozenset({"golden state killer", "joseph deangelo", "deangelo", "earons"}),
+    frozenset({"richard ramirez", "night stalker", "ramirez"}),
+    frozenset({"aileen wuornos", "wuornos"}),
+    frozenset({"green river", "gary ridgway", "ridgway"}),
+    frozenset({"ed gein", "gein", "plainfield"}),
+    frozenset({"hillside strangler", "bianchi", "buono"}),
+]
+
+_TOPIC_STOPWORDS = frozenset(
+    {
+        "the", "a", "an", "and", "or", "of", "in", "on", "to", "for", "with", "from",
+        "why", "how", "who", "what", "when", "where", "was", "were", "is", "are",
+        "case", "cases", "murder", "murders", "killer", "killers", "serial", "true",
+        "crime", "story", "full", "note", "notes", "trial", "investigation", "mystery",
+        "disappearance", "kidnap", "kidnapping", "ransom", "house", "left", "never",
+        "words", "zero", "found", "three", "page", "pages", "long", "remains",
+        "forensic", "puzzle", "documentary", "real", "life", "death", "killed",
+        # Places alone are too broad ("Boulder" ≠ every Boulder case).
+        "boulder", "florida", "chicago", "california", "milwaukee", "wichita", "boston",
+        "aruba", "plainfield", "highway", "museum", "basement", "kidnappers",
+    }
+)
+
+
+def normalize_topic_text(text: str) -> str:
+    t = (text or "").lower().replace("é", "e").replace("á", "a").replace("í", "i")
+    t = t.replace("ó", "o").replace("ú", "u").replace("ñ", "n")
+    t = re.sub(r"[^a-z0-9\s]", " ", t)
+    return re.sub(r"\s+", " ", t).strip()
+
+
+def extract_case_keys(text: str) -> set[str]:
+    """Canonical case keys for hard dedupe (aliases + distinctive tokens)."""
+    norm = normalize_topic_text(text)
+    if not norm:
+        return set()
+    keys: set[str] = set()
+    for group in CASE_ALIAS_GROUPS:
+        if any(alias in norm for alias in group):
+            # Store a stable group id (sorted join) plus short aliases for matching.
+            keys.add("group:" + "|".join(sorted(group)))
+            keys.update(group)
+    for token in norm.split():
+        if len(token) >= 5 and token not in _TOPIC_STOPWORDS:
+            keys.add(token)
+    # Bigrams of non-stopwords catch "scott peterson" style pairs.
+    words = [w for w in norm.split() if w not in _TOPIC_STOPWORDS and len(w) >= 3]
+    for i in range(len(words) - 1):
+        bigram = f"{words[i]} {words[i + 1]}"
+        if len(bigram) >= 8:
+            keys.add(bigram)
+    return keys
+
+
+def case_keys_for_history_row(row: dict[str, Any]) -> set[str]:
+    stored = row.get("case_keys")
+    if isinstance(stored, list) and stored:
+        return {str(x).lower() for x in stored}
+    blob = " ".join(
+        str(row.get(k, "")) for k in ("topic", "title", "blocked_entities") if row.get(k)
+    )
+    if isinstance(row.get("blocked_entities"), list):
+        blob += " " + " ".join(str(x) for x in row["blocked_entities"])
+    return extract_case_keys(blob)
+
+
+def blocked_case_keys(history: list[dict[str, Any]] | None = None) -> set[str]:
+    history = history if history is not None else load_topic_history()
+    blocked: set[str] = set()
+    for row in history:
+        blocked |= case_keys_for_history_row(row)
+    return blocked
+
+
+def topic_overlaps_history(topic: str, history: list[dict[str, Any]] | None = None) -> str | None:
+    """
+    Return a short reason if topic is the same case (or too close) as a past video.
+    One published video covers the whole case — no alternate angles.
+    """
+    history = history if history is not None else load_topic_history()
+    cand = extract_case_keys(topic)
+    if not cand:
+        return None
+    for row in history:
+        past_keys = case_keys_for_history_row(row)
+        overlap = {
+            k for k in (cand & past_keys) if k not in _TOPIC_STOPWORDS and len(k) >= 5
+        }
+        if not overlap:
+            continue
+        # Require a strong signal: alias-group hit, multi-word key, or 2+ tokens.
+        strong = any(k.startswith("group:") or " " in k for k in overlap) or len(overlap) >= 2
+        if not strong:
+            continue
+        past_label = row.get("title") or row.get("topic") or "prior video"
+        sample = ", ".join(sorted(overlap)[:4])
+        return f"overlaps prior case ({past_label}) via [{sample}]"
+    return None
+
+
 def load_topic_history(path: Path | None = None) -> list[dict[str, Any]]:
     path = path or CONFIG / "topic_history.json"
     if not path.exists():
@@ -461,14 +577,29 @@ def load_topic_history(path: Path | None = None) -> list[dict[str, Any]]:
     return []
 
 
-def format_topic_history_for_prompt(topics: list[dict[str, Any]], limit: int = 12) -> str:
+def format_topic_history_for_prompt(topics: list[dict[str, Any]], limit: int = 80) -> str:
     if not topics:
         return "(none yet — this is the first video)"
-    lines: list[str] = []
+    lines: list[str] = [
+        "HARD BAN — these cases/people are CLOSED. One video already covered each fully.",
+        "Do NOT propose the same case, person, killer, victim family, or any alternate angle/title:",
+    ]
     for row in topics[-limit:]:
         title = row.get("title") or row.get("topic") or "Unknown"
+        topic = row.get("topic") or ""
         run_id = row.get("run_id", "")
-        lines.append(f"- {title}" + (f" [{run_id}]" if run_id else ""))
+        keys = sorted(k for k in case_keys_for_history_row(row) if not k.startswith("group:"))[:8]
+        line = f"- DONE: {title}"
+        if topic and topic != title:
+            line += f" (research key: {topic})"
+        if run_id:
+            line += f" [{run_id}]"
+        if keys:
+            line += f" | ban tokens: {', '.join(keys)}"
+        lines.append(line)
+    lines.append(
+        "Never rewrite a DONE case into a 'new' curiosity title. Pick a completely different case."
+    )
     return "\n".join(lines)
 
 
@@ -479,19 +610,51 @@ def append_topic_history(
     topic: str,
     title: str,
     series_type: str | None = None,
-    max_entries: int = 30,
+    max_entries: int = 200,
 ) -> None:
     existing = load_topic_history(path)
+    keys = sorted(extract_case_keys(f"{topic} {title}"))
     row: dict[str, Any] = {
         "run_id": run_id,
         "topic": topic,
         "title": title,
+        "case_keys": keys,
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
     if series_type:
         row["series_type"] = series_type
+    # Replace same-case row if somehow duplicated; else append.
+    existing = [
+        r for r in existing if not topic_overlaps_history(topic, [r]) and not topic_overlaps_history(title, [r])
+    ]
     existing.append(row)
     save_json(path, {"topics": existing[-max_entries:]})
+
+
+def filter_topics_against_history(
+    topics: list[str],
+    history: list[dict[str, Any]] | None = None,
+) -> tuple[list[str], list[tuple[str, str]]]:
+    """Keep only topics that do not overlap past cases. Returns (kept, rejected_with_reason)."""
+    history = history if history is not None else load_topic_history()
+    kept: list[str] = []
+    rejected: list[tuple[str, str]] = []
+    for t in topics:
+        reason = topic_overlaps_history(t, history)
+        if reason:
+            rejected.append((t, reason))
+        else:
+            kept.append(t)
+    return kept, rejected
+
+
+def parse_numbered_topics(raw: str) -> list[str]:
+    out: list[str] = []
+    for line in (raw or "").splitlines():
+        cleaned = re.sub(r"^\d+[\).\s]+", "", line.strip()).strip('"').strip("'")
+        if cleaned and len(cleaned) > 12:
+            out.append(cleaned)
+    return out
 
 
 def next_series_type(history: list[dict[str, Any]] | None = None) -> str:

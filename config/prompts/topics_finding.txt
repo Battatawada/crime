@@ -2,7 +2,6 @@ Channel: Criminally Drawn. Host: Jonty (cold documentary narrator). Real true-cr
 
 This step runs BEFORE web research. The notebook may be empty — that is EXPECTED and OK.
 
-Past videos we ALREADY published (do NOT repeat or closely rephrase):
 {past_topics}
 
 This upload's series type: {series_type}
@@ -12,6 +11,10 @@ This upload's series type: {series_type}
 Your job is ONLY to name publicly known cases/people that already exist in the public record (Wikipedia / major news / court reporting). We will run NotebookLM web research on the chosen title NEXT. You are not inventing crimes and you are not writing the story yet.
 
 Generate 10 NEW topic lines for that series type only.
+
+CRITICAL coverage rule:
+- Each published video covers ONE case/person FULLY (all major angles, notes, trials, suspects).
+- NEVER propose a case, killer, victim, or family that appears in the HARD BAN list above — not even a different curiosity angle, subtitle, or "the note / the trial / the confession" rewrite.
 
 Each line is a RESEARCH KEY for web search — include the real proper name — but phrase it with curiosity energy (not dry encyclopedia labels). Final YouTube title will be rewritten later in SEO; still make these scroll-stopping.
 

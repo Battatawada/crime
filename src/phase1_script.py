@@ -32,6 +32,7 @@ from common import (
     extract_notebook_id,
     extract_source_id,
     fallback_seo,
+    filter_topics_against_history,
     format_topic_history_for_prompt,
     is_valid_image_prompt,
     is_transient_notebooklm_error,
@@ -43,6 +44,7 @@ from common import (
     notebooklm_json,
     notebooklm_json_with_retry,
     parse_image_prompt_lines,
+    parse_numbered_topics,
     parse_seo_json,
     parse_total_parts,
     prompts_to_scenes,
@@ -51,6 +53,7 @@ from common import (
     split_script_for_scenes,
     strip_markdown,
     strip_total_parts_header,
+    topic_overlaps_history,
 )
 
 
@@ -202,30 +205,35 @@ def _looks_like_topic_refusal(text: str) -> bool:
 
 def _seed_topics_block(series_type: str) -> str:
     seeds = load_json(CONFIG / "topic_seeds.json") if (CONFIG / "topic_seeds.json").exists() else {}
-    items = seeds.get(series_type) or seeds.get("incident") or []
-    history = {str(h.get("topic", "")).strip().lower() for h in load_topic_history()}
-    lines: list[str] = []
-    for item in items:
-        if str(item).strip().lower() in history:
+    items = [str(x).strip() for x in (seeds.get(series_type) or seeds.get("incident") or [])]
+    history = load_topic_history()
+    kept, rejected = filter_topics_against_history(items, history)
+    for t, reason in rejected[:5]:
+        print(f"  Seed blocked: {t[:80]} — {reason}", flush=True)
+    if not kept:
+        kept = ["Unsolved Isabella Stewart Gardner Museum heist 1990"]
+    return "\n".join(f"{i}. {t}" for i, t in enumerate(kept[:10], 1))
+
+
+def _first_fresh_topic(topics_raw: str, history: list | None = None) -> str:
+    history = history if history is not None else load_topic_history()
+    for cleaned in parse_numbered_topics(topics_raw):
+        if _BAD_TOPIC.search(cleaned):
             continue
-        lines.append(str(item).strip())
-        if len(lines) >= 10:
-            break
-    if not lines:
-        lines = [str(x).strip() for x in (items[:10] or ["Ted Bundy — life and crimes"])]
-    return "\n".join(f"{i}. {t}" for i, t in enumerate(lines, 1))
-
-
-def _first_topic_from_list(topics_raw: str) -> str:
-    for line in topics_raw.splitlines():
-        cleaned = re.sub(r"^\d+[\).\s]+", "", line.strip()).strip('"')
-        if cleaned and len(cleaned) > 15 and not _BAD_TOPIC.search(cleaned):
+        reason = topic_overlaps_history(cleaned, history)
+        if reason:
+            print(f"  Skip listed topic (history): {cleaned[:80]} — {reason}", flush=True)
+            continue
+        if len(cleaned) > 15:
             return cleaned
-    raise RuntimeError("Could not parse any topic from topics_list")
+    raise RuntimeError(
+        "All candidate topics overlap past cases. Update topic_seeds.json / history, then re-run."
+    )
 
 
 def pick_topic(notebook_id: str, topics_raw: str, past_topics: str, series_type: str) -> str:
     """Pick topic in the same NotebookLM chat as topics list (no --new)."""
+    history = load_topic_history()
     prompt = (
         load_prompt("pick_topic.txt")
         .replace("{past_topics}", past_topics)
@@ -238,12 +246,16 @@ def pick_topic(notebook_id: str, topics_raw: str, past_topics: str, series_type:
         line = re.sub(r"^\d+[\).\s]+", "", line)
         line = line.strip('"').strip("'")
         if _BAD_TOPIC.search(line) or len(line) < 15:
-            print("  Warning: bad topic pick, using first listed topic", flush=True)
-            return _first_topic_from_list(topics_raw)
+            print("  Warning: bad topic pick, using first fresh listed topic", flush=True)
+            return _first_fresh_topic(topics_raw, history)
+        reason = topic_overlaps_history(line, history)
+        if reason:
+            print(f"  Warning: model re-picked a closed case — {reason}", flush=True)
+            return _first_fresh_topic(topics_raw, history)
         return line
     except Exception as exc:
-        print(f"  Warning: topic pick failed ({exc}), using first listed topic", flush=True)
-        return _first_topic_from_list(topics_raw)
+        print(f"  Warning: topic pick failed ({exc}), using first fresh listed topic", flush=True)
+        return _first_fresh_topic(topics_raw, history)
 
 
 def add_web_research(notebook_id: str, topic: str, pipeline: dict) -> list[str]:
@@ -584,13 +596,39 @@ def main() -> None:
                 flush=True,
             )
             topics_raw = _seed_topics_block(series_type)
+
+        # Hard filter before pick — prompts alone are not enough (JonBenét twice).
+        parsed = parse_numbered_topics(topics_raw)
+        kept, rejected = filter_topics_against_history(parsed, history)
+        for t, reason in rejected:
+            print(f"  Topic blocked: {t[:90]} — {reason}", flush=True)
+        if len(kept) < 3:
+            print(
+                f"  Warning: only {len(kept)} fresh topics after history filter — "
+                "merging local seeds",
+                flush=True,
+            )
+            seed_raw = _seed_topics_block(series_type)
+            for t in parse_numbered_topics(seed_raw):
+                if t not in kept and not topic_overlaps_history(t, history):
+                    kept.append(t)
+        if not kept:
+            raise RuntimeError(
+                "No fresh topics left after history filter. "
+                "Add unused cases to config/topic_seeds.json."
+            )
+        topics_raw = "\n".join(f"{i}. {t}" for i, t in enumerate(kept[:10], 1))
         (out / "topics_list.txt").write_text(topics_raw, encoding="utf-8")
 
         print("[Step 2] Pick topic...", flush=True)
         topic = pick_topic(notebook_id, topics_raw, past_topics, series_type)
         if _BAD_TOPIC.search(topic) or _looks_like_topic_refusal(topic):
-            print("  Warning: pick looked like a refusal — using first seeded/listed topic", flush=True)
-            topic = _first_topic_from_list(topics_raw)
+            print("  Warning: pick looked like a refusal — using first fresh listed topic", flush=True)
+            topic = _first_fresh_topic(topics_raw, history)
+        overlap = topic_overlaps_history(topic, history)
+        if overlap:
+            print(f"  Warning: final pick blocked — {overlap}", flush=True)
+            topic = _first_fresh_topic(topics_raw, history)
         print(f"  -> {topic}", flush=True)
 
         if len(topic) > 180 or topic.lower().startswith("since "):
