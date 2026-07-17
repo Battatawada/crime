@@ -7,6 +7,7 @@ Series type required this run: {series_type}
 The notebook may still be empty — that is OK. Pick from the numbered list only.
 
 Pick for: clear public-source coverage, high curiosity CTR, and a complete story that fits ~25 minutes (up to ~30 if dense). One video must cover the whole case — so never choose anything related to a HARD BAN / DONE case.
+Never pick a near-paraphrase or alternate angle of a DONE case (same person/family/killer under a new curiosity title).
 
 Reply with ONLY the topic title on one line — no numbering, no explanation, no quotes, no refusal.
 If you cannot choose, repeat topic #1's title exactly.

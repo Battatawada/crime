@@ -629,6 +629,9 @@ def main() -> None:
         if overlap:
             print(f"  Warning: final pick blocked — {overlap}", flush=True)
             topic = _first_fresh_topic(topics_raw, history)
+        final_hit = topic_overlaps_history(topic, history)
+        if final_hit:
+            raise RuntimeError(f"Refusing near-duplicate / closed case: {topic} — {final_hit}")
         print(f"  -> {topic}", flush=True)
 
         if len(topic) > 180 or topic.lower().startswith("since "):

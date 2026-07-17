@@ -503,10 +503,11 @@ def extract_case_keys(text: str) -> set[str]:
         return set()
     keys: set[str] = set()
     for group in CASE_ALIAS_GROUPS:
-        if any(alias in norm for alias in group):
+        lowered = {alias.lower() for alias in group}
+        if any(alias in norm for alias in lowered):
             # Store a stable group id (sorted join) plus short aliases for matching.
-            keys.add("group:" + "|".join(sorted(group)))
-            keys.update(group)
+            keys.add("group:" + "|".join(sorted(lowered)))
+            keys.update(lowered)
     for token in norm.split():
         if len(token) >= 5 and token not in _TOPIC_STOPWORDS:
             keys.add(token)
@@ -544,11 +545,20 @@ def topic_overlaps_history(topic: str, history: list[dict[str, Any]] | None = No
     Return a short reason if topic is the same case (or too close) as a past video.
     One published video covers the whole case — no alternate angles.
     """
+    from difflib import SequenceMatcher
+
     history = history if history is not None else load_topic_history()
     cand = extract_case_keys(topic)
-    if not cand:
-        return None
+    cand_norm = normalize_topic_text(topic)
     for row in history:
+        past_label = row.get("title") or row.get("topic") or "prior video"
+        past_blob = f"{row.get('title', '')} {row.get('topic', '')}".strip()
+        past_norm = normalize_topic_text(past_blob)
+        if cand_norm and past_norm:
+            ratio = SequenceMatcher(None, cand_norm, past_norm).ratio()
+            if ratio >= 0.72:
+                return f"too similar to prior case ({past_label}) similarity={ratio:.2f}"
+
         past_keys = case_keys_for_history_row(row)
         overlap = {
             k for k in (cand & past_keys) if k not in _TOPIC_STOPWORDS and len(k) >= 5
@@ -559,7 +569,6 @@ def topic_overlaps_history(topic: str, history: list[dict[str, Any]] | None = No
         strong = any(k.startswith("group:") or " " in k for k in overlap) or len(overlap) >= 2
         if not strong:
             continue
-        past_label = row.get("title") or row.get("topic") or "prior video"
         sample = ", ".join(sorted(overlap)[:4])
         return f"overlaps prior case ({past_label}) via [{sample}]"
     return None
