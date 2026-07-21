@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 """
-Phase 2 — edge-tts
+Phase 2 — Azure Neural TTS (primary) + edge-tts fallback.
 
-  Dual narrators like Mind In Minutes — Emily primary, Andrew every 4th scene.
-  Per-scene audio + word_timings.json for karaoke captions + captions.srt
+  Per-scene: split into chunks (rate/pitch/volume + voice), concat, word timings.
 """
 
 from __future__ import annotations
@@ -15,30 +14,57 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import edge_tts
 
-from captions import (
-    ANDREW,
-    EMILY,
-    attach_punctuation_from_text,
-    estimate_word_timings,
-    merge_srt_blocks,
-    pick_narrator_voice,
-    resolve_voice,
-)
+import azure_tts
+from captions import attach_punctuation_from_text, merge_srt_blocks, resolve_voice
 from common import CONFIG, clean_script_for_tts, load_json, save_json, split_script_for_scenes
+from tts_narration import (
+    TtsChunk,
+    load_voice_pool,
+    merge_for_azure_economy,
+    offset_word_timings,
+    plan_tts_chunks,
+)
 
-DEFAULT_VOICES = [EMILY, ANDREW]
 MAX_TTS_RETRIES = 4
 EMPTY_SCENE_SEC = 0.35
+INTER_CHUNK_PAUSE_SEC = 0.14
+
+TtsProvider = Literal["azure", "edge"]
+_active_provider: TtsProvider | None = None
+
+
+def _preferred_provider(pipeline: dict[str, Any]) -> TtsProvider:
+    pref = str(pipeline.get("tts_provider", "azure")).lower()
+    if pref == "edge":
+        return "edge"
+    if pref == "azure" and azure_tts.is_configured():
+        return "azure"
+    if azure_tts.is_configured():
+        return "azure"
+    return "edge"
+
+
+def _get_provider(pipeline: dict[str, Any]) -> TtsProvider:
+    global _active_provider
+    if _active_provider is None:
+        _active_provider = _preferred_provider(pipeline)
+    return _active_provider
+
+
+def _fallback_to_edge(reason: str) -> None:
+    global _active_provider
+    if _active_provider != "edge":
+        print(f"Phase 2: falling back to edge-tts ({reason})", flush=True)
+        _active_provider = "edge"
 
 
 def write_silent_mp3(dest: Path, duration: float = EMPTY_SCENE_SEC) -> None:
-    """Placeholder audio so concat length matches scene_durations.json."""
     subprocess.run(
         [
             "ffmpeg", "-y", "-f", "lavfi", "-i", "anullsrc=r=24000:cl=mono",
@@ -49,33 +75,41 @@ def write_silent_mp3(dest: Path, duration: float = EMPTY_SCENE_SEC) -> None:
     )
 
 
-async def synthesize_with_captions(
-    text: str, voice: str, rate: str, dest: Path
+async def synthesize_chunk_edge(
+    chunk: TtsChunk,
+    dest: Path,
 ) -> tuple[str, list[dict[str, Any]]]:
-    """Synthesize MP3; return SRT block + word timings for karaoke overlay."""
-    if not text.strip():
+    """Synthesize one prosody/voice chunk via edge-tts; return SRT + word timings."""
+    if not chunk.text.strip():
         write_silent_mp3(dest, EMPTY_SCENE_SEC)
         return "", []
 
-    voice = resolve_voice(voice)
+    voice = resolve_voice(chunk.voice)
     last_err: Exception | None = None
 
     for attempt in range(MAX_TTS_RETRIES):
-        communicate = edge_tts.Communicate(text, voice, rate=rate, boundary="WordBoundary")
+        communicate = edge_tts.Communicate(
+            chunk.text,
+            voice,
+            rate=chunk.rate,
+            volume=chunk.volume,
+            pitch=chunk.pitch,
+            boundary="WordBoundary",
+        )
         submaker = edge_tts.SubMaker()
         words: list[dict[str, Any]] = []
         try:
             with dest.open("wb") as audio_file:
-                async for chunk in communicate.stream():
-                    if chunk["type"] == "audio":
-                        audio_file.write(chunk["data"])
-                    elif chunk["type"] == "WordBoundary":
-                        submaker.feed(chunk)
-                        start = chunk["offset"] / 10_000_000
-                        duration = chunk["duration"] / 10_000_000
+                async for event in communicate.stream():
+                    if event["type"] == "audio":
+                        audio_file.write(event["data"])
+                    elif event["type"] == "WordBoundary":
+                        submaker.feed(event)
+                        start = event["offset"] / 10_000_000
+                        duration = event["duration"] / 10_000_000
                         words.append(
                             {
-                                "text": chunk["text"],
+                                "text": event["text"],
                                 "start": round(start, 4),
                                 "end": round(start + duration, 4),
                             }
@@ -103,6 +137,28 @@ async def synthesize_with_captions(
             raise
 
     raise last_err or RuntimeError("TTS failed")
+
+
+async def synthesize_chunk(
+    chunk: TtsChunk,
+    dest: Path,
+    *,
+    pipeline: dict[str, Any],
+) -> tuple[str, list[dict[str, Any]]]:
+    provider = _get_provider(pipeline)
+    if provider == "azure":
+        for attempt in range(MAX_TTS_RETRIES):
+            try:
+                return await asyncio.to_thread(azure_tts.synthesize_chunk, chunk, dest)
+            except Exception as exc:
+                dest.unlink(missing_ok=True)
+                transient = azure_tts.is_transient_error(exc)
+                if transient and attempt + 1 < MAX_TTS_RETRIES:
+                    await asyncio.sleep(1.5 * (attempt + 1))
+                    continue
+                _fallback_to_edge(str(exc))
+                break
+    return await synthesize_chunk_edge(chunk, dest)
 
 
 def concat_audio(parts: list[Path], output: Path) -> None:
@@ -140,11 +196,122 @@ def probe_duration(path: Path) -> float:
     return max(0.5, float(result.stdout.strip()))
 
 
+def estimate_word_timings(text: str, duration: float) -> list[dict]:
+    tokens = __import__("re").findall(r"\S+", text.strip())
+    if not tokens or duration <= 0:
+        return []
+    weights = [max(1, len(__import__("re").sub(r"[^\w']", "", t))) for t in tokens]
+    total = sum(weights)
+    t = 0.0
+    out: list[dict] = []
+    for token, weight in zip(tokens, weights):
+        span = duration * (weight / total)
+        out.append({"text": token, "start": round(t, 4), "end": round(t + span, 4)})
+        t += span
+    return out
+
+
+def _apply_pipeline_env(pipeline: dict[str, Any]) -> None:
+    if pipeline.get("tts_azure_style_degree") is not None:
+        os.environ["TTS_AZURE_STYLE_DEGREE"] = str(pipeline["tts_azure_style_degree"])
+
+
+async def synthesize_scene(
+    text: str,
+    *,
+    scene_index: int,
+    pool: dict[str, str],
+    base_rate: str,
+    modulation: bool,
+    dest: Path,
+    tmp_dir: Path,
+    pipeline: dict[str, Any],
+) -> tuple[str, list[dict], list[dict]]:
+    """Synthesize one scene; may be multiple internal chunks."""
+    if not text.strip():
+        write_silent_mp3(dest, EMPTY_SCENE_SEC)
+        return "", [], []
+
+    chunks = plan_tts_chunks(
+        text,
+        scene_index=scene_index,
+        pool=pool,
+        base_rate=base_rate,
+        modulation=modulation,
+    )
+    if (
+        pipeline.get("tts_merge_chunks", True)
+        and _get_provider(pipeline) == "azure"
+        and len(chunks) > 1
+    ):
+        chunks = merge_for_azure_economy(chunks, scene_index=scene_index)
+    if len(chunks) == 1:
+        ch = chunks[0]
+        srt, words = await synthesize_chunk(ch, dest, pipeline=pipeline)
+        if words:
+            words = attach_punctuation_from_text(words, ch.text)
+        meta = [{"text": ch.text, "voice": ch.voice, "rate": ch.rate, "pitch": ch.pitch, "role": ch.role}]
+        return srt, words, meta
+
+    part_files: list[Path] = []
+    srt_blocks: list[str] = []
+    all_words: list[dict] = []
+    chunk_meta: list[dict] = []
+    clock = 0.0
+
+    for i, ch in enumerate(chunks):
+        part = tmp_dir / f"chunk_{scene_index}_{i}.mp3"
+        srt, words = await synthesize_chunk(ch, part, pipeline=pipeline)
+        dur = probe_duration(part)
+        if ch.text.strip() and not words:
+            words = estimate_word_timings(ch.text, dur)
+        if words:
+            words = attach_punctuation_from_text(words, ch.text)
+            words = offset_word_timings(words, clock)
+        part_files.append(part)
+        srt_blocks.append(srt)
+        all_words.extend(words)
+        chunk_meta.append(
+            {
+                "text": ch.text,
+                "voice": ch.voice,
+                "rate": ch.rate,
+                "pitch": ch.pitch,
+                "volume": ch.volume,
+                "role": ch.role,
+            }
+        )
+        clock += dur
+        if i + 1 < len(chunks):
+            pause = tmp_dir / f"pause_{scene_index}_{i}.mp3"
+            write_silent_mp3(pause, INTER_CHUNK_PAUSE_SEC)
+            part_files.append(pause)
+            clock += INTER_CHUNK_PAUSE_SEC
+
+    concat_audio(part_files, dest)
+    # Merge SRT with offsets for this scene only
+    offsets = []
+    run = 0.0
+    for i, part in enumerate(part_files):
+        if part.name.startswith("pause_"):
+            run += INTER_CHUNK_PAUSE_SEC
+            continue
+        offsets.append(run)
+        run += probe_duration(part)
+    merged_srt = merge_srt_blocks(
+        [srt_blocks[j] for j in range(len(srt_blocks))],
+        offsets[: len(srt_blocks)],
+    )
+    return merged_srt, all_words, chunk_meta
+
+
 async def run_phase(
     input_dir: Path,
     output_dir: Path,
-    voices: list[str],
-    rate: str,
+    pool: dict[str, str],
+    base_rate: str,
+    modulation: bool,
+    pipeline: dict[str, Any],
 ) -> None:
     script = clean_script_for_tts((input_dir / "script.txt").read_text(encoding="utf-8"))
     scenes_meta = load_json(input_dir / "scenes.json")
@@ -177,23 +344,31 @@ async def run_phase(
         for i, item in enumerate(scenes_meta):
             sid = int(item["scene_id"])
             text = segments[i] if i < len(segments) else ""
-            voice = pick_narrator_voice(i, voices, text)
             part = tmp_path / f"scene_{sid:02d}.mp3"
-            srt, words = await synthesize_with_captions(text, voice, rate, part)
+            srt, words, chunk_meta = await synthesize_scene(
+                text,
+                scene_index=i,
+                pool=pool,
+                base_rate=base_rate,
+                modulation=modulation,
+                dest=part,
+                tmp_dir=tmp_path,
+                pipeline=pipeline,
+            )
             dur = probe_duration(part)
-            if text.strip() and not words:
-                words = estimate_word_timings(text, dur)
-            if text.strip() and words:
-                words = attach_punctuation_from_text(words, text)
+            primary_voice = chunk_meta[0]["voice"] if chunk_meta else pool.get("narrator", "")
             durations.append(
                 {
                     "scene_id": sid,
                     "duration_sec": round(dur, 3),
                     "file": f"scene_{sid:02d}.png",
-                    "voice": voice,
+                    "voice": primary_voice,
+                    "tts_chunks": chunk_meta,
                 }
             )
-            word_timings.append({"scene_id": sid, "voice": voice, "words": words})
+            word_timings.append(
+                {"scene_id": sid, "voice": primary_voice, "words": words, "chunks": chunk_meta}
+            )
             part_files.append(part)
             srt_blocks.append(srt)
             offsets.append(clock)
@@ -213,17 +388,27 @@ async def run_phase(
     )
 
     pipeline_path = CONFIG / "pipeline.json"
-    pipeline = load_json(pipeline_path) if pipeline_path.exists() else {}
-    end_cfg = pipeline.get("end_card", {})
+    pipeline_cfg = load_json(pipeline_path) if pipeline_path.exists() else {}
+    end_cfg = pipeline_cfg.get("end_card", {})
     if end_cfg.get("enabled", True):
         end_script = end_cfg.get(
             "script",
             "If you want the next real case drawn the same way, subscribe to Criminally Drawn. "
             "I'm Jonty. Thank you for watching.",
         )
-        end_voice = resolve_voice(end_cfg.get("voice", voices[0]))
+        end_voice = resolve_voice(end_cfg.get("voice", pool.get("narrator", "")))
+        end_chunk = TtsChunk(
+            text=end_script,
+            voice=end_voice,
+            rate="-8%",
+            pitch="-2Hz",
+            volume="+4%",
+            role="outro",
+            break_before_ms=200,
+            break_after_ms=300,
+        )
         end_path = output_dir / "end_card.mp3"
-        await synthesize_with_captions(end_script, end_voice, rate, end_path)
+        await synthesize_chunk(end_chunk, end_path, pipeline=pipeline)
         save_json(
             output_dir / "end_card.json",
             {
@@ -237,7 +422,9 @@ async def run_phase(
 
     meta = load_json(input_dir / "metadata.json") if (input_dir / "metadata.json").exists() else {}
     meta["total_audio_sec"] = round(sum(d["duration_sec"] for d in durations), 3)
-    meta["tts_voices"] = voices
+    meta["tts_voice_pool"] = pool
+    meta["tts_modulation"] = modulation
+    meta["tts_provider"] = _get_provider(pipeline)
     target = meta.get("duration_minutes", 0) * 60
     if target:
         drift = round(meta["total_audio_sec"] - target, 1)
@@ -246,29 +433,31 @@ async def run_phase(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Phase 2: edge-tts")
+    parser = argparse.ArgumentParser(description="Phase 2: Azure TTS (edge-tts fallback)")
     parser.add_argument("--input", type=Path, default=Path("output"))
     parser.add_argument("--output", type=Path, default=Path("output"))
     parser.add_argument("--pipeline", type=Path, default=CONFIG / "pipeline.json")
     parser.add_argument("--rate", default=None)
+    parser.add_argument("--no-modulation", action="store_true")
     args = parser.parse_args()
 
     pipeline = load_json(args.pipeline) if args.pipeline.exists() else {}
-    voices = pipeline.get("tts_voices") or DEFAULT_VOICES
-    if isinstance(voices, str):
-        voices = [voices]
-    env_voice = os.environ.get("TTS_VOICE", "").strip()
-    if env_voice:
-        voices = [env_voice]
-    voices = [resolve_voice(v) for v in voices]
-    rate = args.rate or os.environ.get("TTS_RATE") or pipeline.get("tts_rate", "-3%")
+    _apply_pipeline_env(pipeline)
+    pool = load_voice_pool(pipeline)
+    modulation = pipeline.get("tts_modulation", True) and not args.no_modulation
+    rate = args.rate or os.environ.get("TTS_RATE") or pipeline.get("tts_rate", "-5%")
 
     try:
-        asyncio.run(run_phase(args.input, args.output, voices, rate))
+        asyncio.run(run_phase(args.input, args.output, pool, rate, modulation, pipeline))
     except Exception as exc:
         print(exc, file=sys.stderr)
         sys.exit(1)
-    print(f"Wrote narration.mp3 + word_timings.json + captions.srt -> {args.output}")
+    provider = _get_provider(pipeline)
+    print(
+        f"Wrote narration.mp3 (provider={provider}, modulation={modulation}, voices={len(pool)}) "
+        f"-> {args.output}",
+        flush=True,
+    )
 
 
 if __name__ == "__main__":

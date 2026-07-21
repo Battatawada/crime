@@ -56,6 +56,7 @@ def main() -> None:
     # Save inside images/ so the GHA `images` artifact ships the thumbnail
     # (parent-only path was dropped before render/upload).
     from thumbnail_quality import crop_thumbnail_letterbox, thumbnail_meets_quality
+    from thumbnail_compose import compose_thumbnail_text, derive_overlay_from_title
 
     thumb_dest = args.output / "thumbnail.png"
     try:
@@ -68,6 +69,14 @@ def main() -> None:
         )
         if crop_thumbnail_letterbox(thumb_dest):
             print(f"cropped letterbox on {thumb_dest}")
+        thumb_json = args.output.parent / "thumbnail.json"
+        if thumb_json.exists():
+            meta = load_json(thumb_json)
+            overlay = str(meta.get("overlay_text") or "").strip()
+            if not overlay:
+                overlay = derive_overlay_from_title(str(meta.get("title", "")))
+            if overlay and compose_thumbnail_text(thumb_dest, overlay):
+                print(f"composed overlay text: {overlay}")
         if thumbnail_meets_quality(thumb_dest):
             print(f"saved {thumb_dest} ({thumb_dest.stat().st_size // 1024}KB)")
             parent_thumb = args.output.parent / "thumbnail.png"

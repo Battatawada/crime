@@ -43,6 +43,7 @@ from common import (
     next_series_type,
     notebooklm_json,
     notebooklm_json_with_retry,
+    parse_hook_package,
     parse_image_prompt_lines,
     parse_numbered_topics,
     parse_seo_json,
@@ -651,11 +652,33 @@ def main() -> None:
         else:
             time.sleep(15)
 
+        print("[Step 2c] Hook + title + thumbnail scene...", flush=True)
+        hook_prompt = load_prompt("story_hook_package.txt").replace("{topic}", topic)
+        hook_raw = ask(notebook_id, hook_prompt, new=True)
+        (out / "hook_package_raw.txt").write_text(hook_raw, encoding="utf-8")
+        try:
+            hook_pkg = parse_hook_package(hook_raw)
+        except ValueError:
+            print("  Hook JSON parse failed, retrying...", flush=True)
+            hook_raw = ask(
+                notebook_id,
+                f"{hook_prompt}\n\nReply with ONLY raw JSON. No markdown fences.",
+                new=True,
+            )
+            (out / "hook_package_raw.txt").write_text(hook_raw, encoding="utf-8")
+            hook_pkg = parse_hook_package(hook_raw)
+        save_json(out / "hook_package.json", hook_pkg)
+        video_title = hook_pkg["title"]
+        print(f"  -> title: {video_title}", flush=True)
+        print(f"  -> cold open: {len(hook_pkg['cold_open'].split())} words", flush=True)
+
         print("[Step 3] Script (multi-part)...", flush=True)
         story_prompt = (
             load_prompt("story_generation.txt")
             .replace("{topic}", topic)
             .replace("{duration_minutes}", str(duration))
+            .replace("{video_title}", video_title)
+            .replace("{cold_open}", hook_pkg["cold_open"])
         )
         script, story_parts = collect_multipart_text(notebook_id, story_prompt, continue_word, new=True)
         word_count = len(script.split())
@@ -701,7 +724,7 @@ def main() -> None:
         seo_prompt = (
             load_prompt("youtube_seo.txt")
             .replace("{topic}", topic)
-            .replace("{past_topics}", past_topics)
+            .replace("{locked_title}", video_title)
         )
         seo_raw = ask(notebook_id, seo_prompt, new=True)
         (out / "youtube_seo_raw.txt").write_text(seo_raw, encoding="utf-8")
@@ -726,7 +749,9 @@ def main() -> None:
             thumb_prompt = (
                 load_prompt("thumbnail.txt")
                 .replace("{topic}", topic)
-                .replace("{title}", seo.get("title", topic))
+                .replace("{title}", seo.get("title", video_title))
+                .replace("{thumbnail_scene}", hook_pkg.get("thumbnail_scene", ""))
+                .replace("{thumbnail_text}", hook_pkg.get("thumbnail_text", ""))
             )
             thumb_raw = ask(notebook_id, thumb_prompt, new=True)
             thumb_line = " ".join(thumb_raw.strip().splitlines()[0].split()).strip('"')
@@ -746,10 +771,15 @@ def main() -> None:
                 thumbnail_meta = {
                     "prompt": thumb_line,
                     "topic": topic,
-                    "title": seo.get("title", topic),
+                    "title": seo.get("title", video_title),
+                    "overlay_text": hook_pkg.get("thumbnail_text", ""),
                     "entity_refs": entity_refs,
                 }
-                print(f"  -> thumbnail prompt ({len(thumb_line.split())} words)", flush=True)
+                print(
+                    f"  -> thumbnail prompt ({len(thumb_line.split())} words), "
+                    f"overlay: {thumbnail_meta['overlay_text']}",
+                    flush=True,
+                )
 
         try:
             from archival_images import (

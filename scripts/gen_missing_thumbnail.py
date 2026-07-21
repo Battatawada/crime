@@ -17,6 +17,7 @@ from thumbnail_quality import (  # noqa: E402
     sanitize_thumbnail_prompt,
     thumbnail_meets_quality,
 )
+from thumbnail_compose import compose_thumbnail_text, derive_overlay_from_title  # noqa: E402
 
 RUN_ID = sys.argv[1] if len(sys.argv) > 1 else "20260714-135855"
 RUN = Path(f"/opt/niche/runs/{RUN_ID}")
@@ -50,6 +51,11 @@ url, mid = client.generate_scene_image(
 )
 client.download_url(url, dest)
 crop_thumbnail_letterbox(dest)
+overlay = str(THUMB_META.get("overlay_text") or "").strip()
+if not overlay:
+    overlay = derive_overlay_from_title(str(THUMB_META.get("title", "")))
+if overlay:
+    compose_thumbnail_text(dest, overlay)
 if not thumbnail_meets_quality(dest, min_bytes=MIN_THUMB_BYTES):
     raise SystemExit(f"thumbnail failed quality gate: {dest.stat().st_size if dest.exists() else 0}")
 STATE["thumbnail_ready"] = True

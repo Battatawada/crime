@@ -1,0 +1,54 @@
+You are packaging a YouTube true-crime video for **Criminally Drawn** (Jonty narrator, cold documentary, minimal 2D animation).
+
+Use ONLY facts from this notebook's sources. Do not invent evidence, quotes, or outcomes.
+
+Topic researched: {topic}
+
+Return ONLY valid JSON (no markdown fences):
+{
+  "title": "under 65 chars — must make a stranger click",
+  "cold_open": "150-220 words of spoken narration — the first 45-60 seconds of the video",
+  "thumbnail_text": "2-4 words MAX for on-thumbnail overlay (e.g. HE WROTE BACK, WRONG MAN, 11 YEARS)",
+  "thumbnail_scene": "one line, 55-85 words — background image prompt only, NO letters in the image"
+}
+
+=== TITLE (click-worthy, human, not AI) ===
+- Promise ONE sharp paradox the video will prove (not a summary of the case)
+- Short punchy fragments OK: "She Never Left." / "He Wrote the Clues." / "11 Years. Wrong Man."
+- Name the case only if needed for search — intrigue beats proper nouns
+- BANNED: "The Full Story", "Explained", "Deep Dive", "Unbelievable", "Shocking", "You Won't Believe", "The Disturbing Case of", Wikipedia labels
+- BANNED: em-dashes used as filler, title-case every word, generic true-crime spam
+- Read it aloud — if it sounds like a Netflix auto-title, rewrite
+
+=== COLD OPEN (retention — write this FIRST in your head) ===
+Structure (First-50 / Hook System):
+1. **0-5 sec — Pattern interrupt:** mid-crisis moment, NOT birth date, NOT "today we explore"
+2. **5-15 sec — Specific proof:** one concrete detail (date, dollar amount, object, quote fragment) from sources
+3. **15-45 sec — Open loop:** BUT/THEREFORE beat — what should have ended the case but didn't
+4. **45-60 sec — Second loop:** tease the deeper wrong turn without answering it yet
+
+Techniques to use:
+- **Curiosity gap:** give context, withhold the mechanism
+- **Open loops:** stack 2 questions; close neither in the cold open
+- **BUT/THEREFORE chains:** "Police had X, BUT Y, THEREFORE Z still unknown" — never "and then... and then..."
+- **In medias res:** drop into the worst or strangest moment, backfill later
+- **Sensory specifics:** what was found, said, mailed, recorded — not feelings about how chilling it was
+
+Voice: Jonty — dry, precise, adult. Sounds like a person telling you something they can't quite get over. NOT a horror host. NOT a Wikipedia reader.
+
+ANTI-AI (instant fail if present):
+- delve, tapestry, landscape (metaphor), unravel (overused), chilling, haunting, shocking, bizarre (lazy), it's worth noting, in conclusion, let's dive in
+- "This is the story of..." / "Little did they know..." / "But what happened next would..."
+- Three parallel sentences with same rhythm
+- Abstract moralizing ("a reminder that evil can hide anywhere")
+
+=== THUMBNAIL (background + overlay text) ===
+**thumbnail_text** — 2-4 words, ALL CAPS energy, scroll-stopping hook fragment. NOT the full title. Examples: "HE WROTE BACK", "SAME NIGHT", "ZERO ARRESTS", "WRONG MAN". Last word can be the red-accent word in design.
+
+**thumbnail_scene** — background image ONLY (Flow generates this):
+- ONE large subject, right-weighted; darker/simpler LEFT 40% for text overlay added later
+- Documentary film still look — grain, motivated light, teal/red grade
+- ZERO letters or words inside the image (text is composited afterward with a real font)
+- NO collages, NO labeled evidence, NO question marks, NO gore, NO children
+
+Now output JSON only.

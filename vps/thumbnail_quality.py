@@ -8,10 +8,19 @@ from pathlib import Path
 # Soft-reject NotebookLM prompts that recreate the bad JonBenét-style collage.
 _WEAK_THUMB_PATTERNS = re.compile(
     r"question\s*mark|\bgiant\s+\?|\bglowing\s+\?|"
-    r"forensic\s+evidence|evidence\s+folder|readable\s+text|"
+    r"forensic\s+evidence|evidence\s+folder|readable\s+text\s+in\s+(the\s+)?image|"
     r"top\s+third\s+empty|leave\s+the\s+top|"
+    r"collage|split\s+panel|multi[-\s]?panel|clip[-\s]?art|"
+    r"magnifying\s+glass.*red\s+string|red\s+string\s+board|"
     r"\bchild\b|\bchildren\b|\bminor\b|\bgirl\b|\bboy\b|"
     r"pageant|young\s+blonde|school[-\s]?age",
+    re.IGNORECASE,
+)
+
+_AI_THUMB_CLICHES = re.compile(
+    r"\bhyper[-\s]?realistic\b|\b8k\b|\bultra[-\s]?detailed\b|\bmasterpiece\b|"
+    r"\bstunning\b|\bbreathtaking\b|\bepic\b|\bcinematic\s+poster\b|"
+    r"\bgeneric\s+true\s+crime\b",
     re.IGNORECASE,
 )
 
@@ -21,11 +30,11 @@ _CHILD_SAFE_STRIP = re.compile(
 )
 
 THUMB_QUALITY_SUFFIX = (
-    ", edge-to-edge 16:9 YouTube thumbnail filling the entire frame, "
-    "no white borders, no letterboxing, no empty bars, no polaroid frame, "
-    "one bold large focal subject readable on a phone, high contrast cinematic lighting, "
-    "matte black atmosphere with depth, no readable text, no logos, no watermarks, "
-    "no giant question marks, no children, no minors"
+    ", edge-to-edge 16:9 documentary film still filling the entire frame, "
+    "no white borders, no letterboxing, subject weighted to the right two-thirds, "
+    "darker simpler left third for text overlay zone, motivated practical lighting, "
+    "slight film grain, shallow depth of field, no readable text or letters in the image, "
+    "no logos, no watermarks, no giant question marks, no children, not a collage"
 )
 
 THUMB_SAFE_FALLBACK = (
@@ -52,6 +61,7 @@ def sanitize_thumbnail_prompt(prompt: str, *, title: str = "", topic: str = "") 
     cleaned = re.sub(r"(?i)\bgiant\s+glowing\s+white\s+question\s+mark\b", "harsh spotlight", cleaned)
     cleaned = re.sub(r"(?i)\bquestion\s+mark\b", "harsh spotlight", cleaned)
     cleaned = re.sub(r"(?i)\bforensic evidence\b", "blurred paperwork", cleaned)
+    cleaned = _AI_THUMB_CLICHES.sub("documentary still", cleaned)
     if is_weak_thumbnail_prompt(cleaned):
         mood = " ".join(x for x in (title, topic) if x).strip()
         cleaned = THUMB_SAFE_FALLBACK

@@ -758,6 +758,38 @@ def parse_seo_json(text: str) -> dict:
     raise ValueError("No SEO JSON object in NotebookLM response")
 
 
+def parse_hook_package(text: str) -> dict:
+    """Parse hook package JSON: title, cold_open, thumbnail_scene, thumbnail_text."""
+    blocks = extract_json_blocks(text)
+    for block in blocks:
+        if not isinstance(block, dict):
+            continue
+        title = str(block.get("title") or "").strip()
+        cold_open = str(block.get("cold_open") or "").strip()
+        thumbnail_scene = str(block.get("thumbnail_scene") or "").strip()
+        thumbnail_text = str(block.get("thumbnail_text") or "").strip()
+        if title and cold_open and thumbnail_scene:
+            if not thumbnail_text:
+                thumbnail_text = derive_overlay_from_title(title)
+            return {
+                "title": sanitize_seo_title(title),
+                "cold_open": cold_open,
+                "thumbnail_scene": thumbnail_scene,
+                "thumbnail_text": thumbnail_text,
+            }
+    raise ValueError("No hook package JSON in NotebookLM response")
+
+
+def derive_overlay_from_title(title: str, *, max_words: int = 4) -> str:
+    """Short overlay hook from full YouTube title."""
+    raw = re.sub(r"[#*_\"']", "", (title or "").strip())
+    if not raw:
+        return ""
+    chunk = re.split(r"[.!?]", raw, maxsplit=1)[0].strip()
+    words = chunk.split()[:max_words]
+    return " ".join(words).upper()
+
+
 def sanitize_seo_title(title: str, max_chars: int = 65) -> str:
     cleaned = re.sub(r"\*+", "", title or "").strip(" -–—")
     return cleaned[:max_chars].strip()

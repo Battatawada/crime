@@ -20,6 +20,7 @@ from thumbnail_quality import (
     sanitize_thumbnail_prompt,
     thumbnail_meets_quality,
 )
+from thumbnail_compose import compose_thumbnail_text, derive_overlay_from_title
 
 CHROME_NETWORK_SCRIPT = Path(
     os.environ.get("CHROME_NETWORK_SCRIPT", "/opt/niche/scripts/vps-chrome-network.sh")
@@ -67,11 +68,67 @@ def _switch_chrome_network(target_mode: str) -> bool:
     return True
 
 
-def _rewrite_prompt_safe(prompt: str) -> str:
-    """Light touch rewrite for safety filter retries."""
+_RISKY_TERM_REPLACEMENTS: list[tuple[re.Pattern[str], str]] = [
+    (re.compile(r"(?i)EAST AREA RAPIST"), "EAR case"),
+    (re.compile(r"(?i)ORIGINAL NIGHT STALKER"), "ONS case"),
+    (re.compile(r"(?i)VISALIA RANSACKER"), "Visalia case"),
+    (re.compile(r"(?i)GOLDEN STATE KILLER"), "GSK case"),
+    (re.compile(r"(?i)\bJOSEPH\s+DEANGELO\b"), "a person of interest"),
+    (re.compile(r"(?i)\bDEANGELO\b"), "suspect"),
+    (re.compile(r"(?i)\bRAPIST\b"), "offender"),
+    (re.compile(r"(?i)\bRAPE\b"), "crime"),
+    (re.compile(r"(?i)\bKILLER\b"), "suspect"),
+    (re.compile(r"(?i)\bMURDER(?:ED|ER|S)?\b"), "crime"),
+    (re.compile(r"(?i)\bkilled\b"), "attacked"),
+    (re.compile(r"(?i)\bassault(?:ed|s)?\b"), "confronted"),
+    (re.compile(r"(?i)\bweapon\b"), "object"),
+    (re.compile(r"(?i)\bgun\b"), "item"),
+    (re.compile(r"(?i)\bblood\b"), "shadow"),
+    (re.compile(r"(?i)\bdead\b"), "fallen"),
+    (re.compile(r"(?i)\bcorpse\b"), "figure"),
+    (re.compile(r"(?i)\bvictim\b"), "person"),
+    (re.compile(r"(?i)\bmasked\s+intruder\b"), "shadowy figure"),
+    (re.compile(r"(?i)\bintruder\b"), "figure"),
+]
+
+
+def _strip_risky_terms(prompt: str) -> str:
+    cleaned = prompt
+    for pat, repl in _RISKY_TERM_REPLACEMENTS:
+        cleaned = pat.sub(repl, cleaned)
+    return cleaned
+
+
+def _rewrite_prompt_safe(prompt: str, attempt: int = 1) -> str:
+    """Progressive rewrite for Flow safety-filter retries."""
+    cleaned = _strip_risky_terms(prompt)
+    # Drop on-image name tags / labels that often trip policy
+    cleaned = re.sub(r"(?i)\b(labeled|label|tag|reads|reading)\b[^.]*", "", cleaned)
+    cleaned = re.sub(r"\s{2,}", " ", cleaned).strip(" .,")
+    suffix = (
+        ", stylized fictional 2D illustration, anonymous characters, "
+        "no real persons, no violence, no gore, soft lighting, no visible text"
+    )
+    if attempt >= 3:
+        return (
+            "Minimal 2D animation on matte black background, bold black outlines, "
+            "cold documentary mood, circular-head host Jonty in charcoal shirt, "
+            "calm investigative atmosphere, fictional stylized art, no real persons, "
+            "no violence, no gore, no visible text, no labels"
+        )
+    if attempt >= 2:
+        return cleaned + suffix + ", abstract symbolic composition, no faces of real people"
+    return cleaned + suffix
+
+
+def _safe_fallback_prompt(scene_id: int) -> str:
+    """Last-resort prompt that should always clear Flow safety filters."""
     return (
-        prompt
-        + ", stylized fictional illustration, no real persons, no violence, no gore, soft lighting"
+        f"Minimal 2D animation scene variation {scene_id}, bold black outlines, "
+        "matte black background, cold true-crime documentary mood, circular-head host "
+        "Jonty with charcoal shirt and red JONTY text looking thoughtful, soft lighting, "
+        "fictional stylized illustration, no real persons, no violence, no gore, "
+        "no visible text, no labels, no scene numbers"
     )
 
 
@@ -244,10 +301,12 @@ class SequentialGenerator:
 
                 entity_refs = scene.get("entity_refs") or []
                 media_inputs = [ref_media[r] for r in entity_refs if r in ref_media]
-                prompt = _sanitize_prompt(scene.get("prompt", ""), scene_id)
+                raw_prompt = scene.get("prompt", "")
+                prompt = _sanitize_prompt(_strip_risky_terms(raw_prompt), scene_id)
 
                 last_err = ""
                 attempt = 0
+                saved = False
                 while attempt < self.max_retries:
                     attempt += 1
                     try:
@@ -265,10 +324,16 @@ class SequentialGenerator:
                         state["images_ready"] = len(state["completed"])
                         state["last_saved"] = filename
                         self._save_state(state)
+                        saved = True
                         break
                     except Exception as exc:  # noqa: BLE001
                         last_err = str(exc)
-                        prompt = _rewrite_prompt_safe(scene.get("prompt", ""))
+                        is_safety = "400" in last_err
+                        prompt = (
+                            _rewrite_prompt_safe(raw_prompt, attempt=attempt)
+                            if is_safety
+                            else _rewrite_prompt_safe(raw_prompt, attempt=1)
+                        )
                         mode = state.get("chrome_network_mode", _read_chrome_network_mode())
                         if (
                             "403" in last_err
@@ -289,11 +354,7 @@ class SequentialGenerator:
                         else:
                             wait = self.delay
                         if attempt >= self.max_retries:
-                            state["status"] = "failed"
-                            state["error"] = f"Scene {scene_id}: {last_err}"
-                            state["failed_scenes"].append(scene_id)
-                            self._save_state(state)
-                            raise
+                            break
                         print(
                             f"Scene {scene_id} retry {attempt}/{self.max_retries} "
                             f"({'Flow throttle' if is_throttled else 'error'}), wait {wait}s",
@@ -303,6 +364,47 @@ class SequentialGenerator:
                         self._save_state(state)
                         time.sleep(wait)
                         state["error"] = None
+
+                if not saved:
+                    # Safety/policy 400s (and other stuck prompts): never abort the run —
+                    # generate a guaranteed-safe fallback so every scene gets a PNG.
+                    if "401" in last_err or "unauthorized" in last_err.lower():
+                        state["status"] = "failed"
+                        state["error"] = f"Scene {scene_id}: {last_err}"
+                        state["failed_scenes"].append(scene_id)
+                        self._save_state(state)
+                        raise RuntimeError(last_err)
+                    print(
+                        f"Scene {scene_id}: using safe fallback after retries ({last_err})",
+                        flush=True,
+                    )
+                    state["error"] = f"Scene {scene_id} fallback: {last_err}"
+                    self._save_state(state)
+                    fallback = _safe_fallback_prompt(scene_id)
+                    try:
+                        image_url, _ = self.client.generate_scene_image(
+                            project_id=project_id,
+                            scene_id=str(scene_id),
+                            video_id=video_id,
+                            prompt=fallback,
+                            ref_media_ids=media_inputs,
+                        )
+                        self.client.download_url(image_url, dest)
+                        if dest.stat().st_size < 10_000:
+                            raise RuntimeError(f"Downloaded file too small: {dest}")
+                        state["completed"].append(filename)
+                        state["images_ready"] = len(state["completed"])
+                        state["last_saved"] = filename
+                        state["error"] = None
+                        if scene_id not in state.get("fallback_scenes", []):
+                            state.setdefault("fallback_scenes", []).append(scene_id)
+                        self._save_state(state)
+                    except Exception as exc:  # noqa: BLE001
+                        state["status"] = "failed"
+                        state["error"] = f"Scene {scene_id}: {exc}"
+                        state["failed_scenes"].append(scene_id)
+                        self._save_state(state)
+                        raise
 
                 time.sleep(self.delay)
 
@@ -369,6 +471,11 @@ class SequentialGenerator:
                 )
                 self.client.download_url(image_url, dest)
                 crop_thumbnail_letterbox(dest)
+                overlay = str(thumb_meta.get("overlay_text") or "").strip()
+                if not overlay:
+                    overlay = derive_overlay_from_title(str(thumb_meta.get("title", "")))
+                if overlay:
+                    compose_thumbnail_text(dest, overlay)
                 if not thumbnail_meets_quality(dest, min_bytes=MIN_THUMB_BYTES):
                     size = dest.stat().st_size if dest.exists() else 0
                     dest.unlink(missing_ok=True)

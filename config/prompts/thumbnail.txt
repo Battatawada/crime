@@ -1,32 +1,34 @@
-Create ONE YouTube thumbnail IMAGE PROMPT for this true-crime video.
+Write ONE image-generation prompt for the **base layer** of a YouTube thumbnail.
 
 Topic: {topic}
-Video title (mood only — NEVER paint these words into the image): {title}
+Video title (mood only): {title}
+Overlay text (added in post-production — do NOT paint these words into the image): {thumbnail_text}
 
-Goal: scroll-stopping CTR thumbnail that looks like a premium documentary still, not a generic AI collage.
+Pre-approved scene direction:
+{thumbnail_scene}
 
-HARD composition (must obey):
-- Exact framing: edge-to-edge 16:9 YouTube thumbnail — fill the ENTIRE frame
-- NO white borders, NO letterboxing, NO empty top/bottom bars, NO polaroid/frame/mat
-- ONE dominant focal subject (close or medium-close). Subject must be large and readable at phone size
-- High contrast, sharp lighting, cinematic color grade (cold teal/blue + caution red accents OR stark B&W with one red accent)
-- Matte black / deep charcoal environment that still has depth (rim light, fog, lamp, rain glass) — not a flat void
-- Leave a dark quieter zone on the LEFT or RIGHT third for later title overlay — but still fill that zone with atmosphere (shadow, wall, night exterior), never blank white/empty canvas
-- ZERO readable text in the image (no documents titled FORENSIC EVIDENCE, no captions, no watermarks, no logos, no ALL-CAPS labels, no "JONTY" unless using host lockup refs)
-- NO giant question marks, NO emoji, NO sticker badges, NO collage of tiny scattered props
-- NO gore, NO corpses, NO blood pools, NO weapons pointed at camera
-- NO children, NO minors, NO child pageant imagery, NO blurred child faces — adults only, or objects/locations only
-- Prefer adult face emotion / host Jonty (charcoal shirt) reacting OR one iconic adult evidence object (handwritten page, tape recorder, night house exterior, courtroom door) as the hero — not a busy multi-panel layout
+=== TWO-LAYER THUMBNAIL ===
+1. **You are prompting the BACKGROUND IMAGE only.** Short punchy text ({thumbnail_text}) is burned on afterward with a real font — Flow must NOT render letters.
+2. Compose like top true-crime channels: one dramatic visual + 2–4 word title later.
 
-Strong patterns to prefer (pick ONE):
-1) Extreme close-up adult eyes/face half in shadow + one sharp red accent light
-2) Host Jonty mid-frame pointing/reacting toward a single blurred adult evidence photo behind him
-3) Night exterior of a house filling the frame with one lit window and heavy contrast (subject must be large)
+BASE IMAGE RULES:
+- Edge-to-edge 16:9, entire frame filled — no white borders, letterboxing, polaroid mats
+- ONE dominant subject (40%+ of frame): adult face in shadow, hands, night house, car interior, single object
+- **Leave the LEFT 40% slightly darker / simpler** so post-production text reads clearly — but still atmospheric (wall shadow, night sky, fog), never empty white
+- Subject/action weighted to the **RIGHT two-thirds**
+- Lighting: motivated — desk lamp, headlights, fridge glow, streetlight. Not generic AI glow
+- Color: cold teal/blue shadows + one red practical light OR high-contrast B&W + red accent
+- Texture: documentary film still, slight grain, shallow depth of field — not plastic HDR poster
 
-Weak patterns to AVOID:
-- Small scene floating in white/black empty canvas
-- Stack of labeled forms / "evidence folders" with readable headers
-- Centered glowing "?" over a dull collage
-- Tiny house + tiny props with no clear hero
+FLOW IMAGE — NEVER INCLUDE:
+- Any letters, numbers, words, captions, signs, document headers, watermarks, logos
+- Collages, split panels, evidence boards with labels, giant question marks
+- Gore, children, weapons pointed at camera, clip-art magnifying glasses
 
-Output ONLY the image prompt as one standalone line (55–85 words). No numbering, no quotes, no explanation.
+STRONG COMPOSITIONS (pick one):
+- Extreme close-up adult eyes/hands, subject right-weighted, dark left third
+- Night suburban house, one lit window, wet pavement, house right of center
+- Rain on windshield from inside car, blurred streetlights, silhouette right
+- Host Jonty (charcoal shirt, minimal 2D) reacting off-frame right — cartoon only if topic fits
+
+Output ONE line, 55–90 words. No quotes, no numbering.

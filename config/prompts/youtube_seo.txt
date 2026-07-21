@@ -1,32 +1,25 @@
-Create YouTube SEO for **Criminally Drawn** — cold true-crime documentary channel narrated by Jonty (~25 min full case / killer life stories, minimal 2D animation). Voice: dry, human, slightly dark humor — never goofy, never gore-bait.
+Create YouTube metadata for **Criminally Drawn** — cold true-crime documentary, Jonty narrator, ~25 min, minimal 2D animation.
 
-The "Topic / case" below is only the RESEARCH KEY (what was researched). It is NOT the YouTube title.
+The title is LOCKED. Do not change a single character.
+
+Locked title: {locked_title}
+
+Research topic (for description body only): {topic}
 
 Return ONLY valid JSON:
 {
-  "title": "eye-catching curiosity title under 65 chars",
+  "title": "{locked_title}",
   "description": "MINIMUM 600 characters",
   "tags": ["8-15 specific searchable tags"],
-  "hashtags": ["#truecrime", "#criminallydrawn", "plus 1-2 relevant"]
+  "hashtags": ["#truecrime", "#criminallydrawn", "plus 1-2 case-relevant"]
 }
 
-TITLE RULES (hard):
-- Do NOT copy the research topic / Wikipedia-style name verbatim
-- Do NOT use dry patterns like "X — the full story", "The murder of X", "X case", "life and crimes"
-- Make it intrigue-first: contradiction, unanswered question, twist, or cold detail that makes someone stop scrolling
-- Still clearly about THIS real case (viewer can tell who/what after the hook)
-- No ALL CAPS spam, no clickbait lies, no gore words, no "you won't believe"
+DESCRIPTION RULES:
+1. **Opening paragraph (hook):** Jonty's dry human voice — same paradox as the title, one specific detail, one unanswered question. NOT a Wikipedia intro.
+2. **Bullets (3-5):** plain what-the-video-covers lines — timeline, suspects, evidence twist, trial/outcome
+3. Line: Timestamps coming soon
+4. One-line subscribe CTA — Criminally Drawn + Jonty once
+5. Mention real case/person name somewhere for search
+6. Plain text. No gore. No "trust me bro". No AI filler ("in this video we explore")
 
-Good title energy (examples of SHAPE only — invent fresh for this case):
-- "She Was Safe. Then the Timeline Broke."
-- "He Helped Police Find a Killer. It Was Him."
-- "17 Years. One DNA Hit. No Confession."
-
-DESCRIPTION RULES (hard):
-- Do NOT paste or lightly rephrase the research topic as the opening line
-- Structure: (1) hook paragraph in Jonty's dry human voice that teases the mystery without spoiling every beat, (2) 3-5 plain bullets of what the video covers, (3) line 'Timestamps coming soon', (4) short subscribe CTA mentioning Criminally Drawn and Jonty once
-- Plain text only. No gore. No "trust me bro" slang.
-- Mention the real case/person name somewhere in the body for search, but lead with intrigue
-
-Topic / case (research key only — rewrite for title + description):
-{{topic}}
+TAGS: mix broad (true crime documentary, cold case) + specific (killer name, city, nickname, year)
